@@ -27,8 +27,11 @@ class CustomCSRs(implicit p: Parameters) extends CoreBundle {
   protected def chickenCSRId = 0x7c1
   protected def chickenCSR: Option[CustomCSR] = None
 
+  protected def configureCSRId = 0x7c2
+  protected def configureCSR: Option[CustomCSR] = None
+
   // If you override this, you'll want to concatenate super.decls
-  def decls: Seq[CustomCSR] = bpmCSR.toSeq ++ chickenCSR
+  def decls: Seq[CustomCSR] = bpmCSR.toSeq ++ chickenCSR ++ configureCSR
 
   val csrs = Vec(decls.size, new CustomCSRIO)
 
