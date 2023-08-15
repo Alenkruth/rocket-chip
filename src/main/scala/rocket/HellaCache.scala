@@ -12,7 +12,9 @@ import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tile._
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.util._
+import freechips.rocketchip.rocket.constants
 import scala.collection.mutable.ListBuffer
+import javax.swing.InternalFrameFocusTraversalPolicy
 
 case class DCacheParams(
     nSets: Int = 64,
@@ -55,11 +57,11 @@ case class DCacheParams(
     require(isPow2(nSets), s"nSets($nSets) must be pow2")
 }
 
-trait HasL1HellaCacheParameters extends HasL1CacheParameters with HasCoreParameters {
+trait HasL1HellaCacheParameters extends HasL1CacheParameters with constants.CoreFuzzingConstants with HasCoreParameters {
   val cacheParams = tileParams.dcache.get
   val cfg = cacheParams
 
-  def wordBits = coreDataBits
+  def wordBits = coreDataBits // max Xlen, flen and vMemWidth - so should be 64
   def wordBytes = coreDataBytes
   def subWordBits = cacheParams.subWordBits.getOrElse(wordBits)
   def subWordBytes = subWordBits / 8
@@ -71,13 +73,13 @@ trait HasL1HellaCacheParameters extends HasL1CacheParameters with HasCoreParamet
   def idxLSB = blockOffBits
   def offsetmsb = idxLSB-1
   def offsetlsb = wordOffBits
-  def rowWords = rowBits/wordBits
+  def rowWords = rowBits/wordBits // 128/64 - gives us two word per cache row.
   def doNarrowRead = coreDataBits * nWays % rowBits == 0
   def eccBytes = cacheParams.dataECCBytes
   val eccBits = cacheParams.dataECCBytes * 8
   val encBits = cacheParams.dataCode.width(eccBits)
   val encWordBits = encBits * (wordBits / eccBits)
-  def encDataBits = cacheParams.dataCode.width(coreDataBits) // NBDCache only
+  def encDataBits = cacheParams.dataCode.width(coreDataBits) + IFT_BITS // NBDCache only
   def encRowBits = encDataBits*rowWords
   def lrscCycles = coreParams.lrscCycles // ISA requires 16-insn LRSC sequences to succeed
   def lrscBackoff = 3 // disallow LRSC reacquisition briefly
