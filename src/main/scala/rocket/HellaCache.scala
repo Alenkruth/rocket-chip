@@ -79,7 +79,7 @@ trait HasL1HellaCacheParameters extends HasL1CacheParameters with constants.Core
   val eccBits = cacheParams.dataECCBytes * 8
   val encBits = cacheParams.dataCode.width(eccBits)
   val encWordBits = encBits * (wordBits / eccBits)
-  def encDataBits = cacheParams.dataCode.width(coreDataBits) + IFT_BITS // NBDCache only
+  def encDataBits = cacheParams.dataCode.width(coreDataBits)//  + IFT_BITS // NBDCache only
   def encRowBits = encDataBits*rowWords
   def lrscCycles = coreParams.lrscCycles // ISA requires 16-insn LRSC sequences to succeed
   def lrscBackoff = 3 // disallow LRSC reacquisition briefly

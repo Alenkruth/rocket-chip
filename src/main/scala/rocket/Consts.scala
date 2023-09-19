@@ -95,8 +95,10 @@ trait CoreFuzzingConstants
   val IFT_BITS = 1
 
   // protected address range
-  val IFT_PROTECTED_START = 0x80001060L //.S(48.W).asUInt // for the hello world example
-  val IFT_PROTECTED_END = 0x80001080L //.S(48.W).asUInt // will this work?
+  // 2c10 - 2c40 for the boom attack test
+  // for hello world, the range was 80001060 to 80001080
+  val IFT_PROTECTED_START = 0x80002c10L //.S(48.W).asUInt // for the hello world example
+  val IFT_PROTECTED_END = 0x80002c40L //.S(48.W).asUInt // will this work?
   //val IFT_PROTECTED_END = Wire(chiselTypeOf("h080001080".U(48.W))) // we are hardcoding the width to 48 (sv48 at most)
 
   // val IFT_PROTECTED_START = 0x80001206L // start of victim function in condbranchmispred
