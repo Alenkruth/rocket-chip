@@ -89,7 +89,7 @@ trait MemoryOpConstants {
 
 // consts for CoreFuzzing - AK
 
-trait CoreFuzzingConstants
+/*trait CoreFuzzingConstants
 {
   // number of bits used as tag for IFT
   val IFT_BITS = 1
@@ -103,4 +103,4 @@ trait CoreFuzzingConstants
 
   // val IFT_PROTECTED_START = 0x80001206L // start of victim function in condbranchmispred
   // val IFT_PROTECTED_END = 0x800012acL // end of victim function in condbranchmispred
-}
+}*/

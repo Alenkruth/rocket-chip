@@ -4,7 +4,7 @@
 package freechips.rocketchip.rocket
 
 import chisel3._
-import chisel3.util.{isPow2,log2Ceil,log2Up,Decoupled,Valid}
+import chisel3.util._ // {isPow2,log2Ceil,log2Up,Decoupled,Valid}
 import chisel3.dontTouch
 import freechips.rocketchip.amba._
 import org.chipsalliance.cde.config.{Parameters, Field}
@@ -57,7 +57,7 @@ case class DCacheParams(
     require(isPow2(nSets), s"nSets($nSets) must be pow2")
 }
 
-trait HasL1HellaCacheParameters extends HasL1CacheParameters with constants.CoreFuzzingConstants with HasCoreParameters {
+trait HasL1HellaCacheParameters extends HasL1CacheParameters with HasCoreParameters {
   val cacheParams = tileParams.dcache.get
   val cfg = cacheParams
 
@@ -297,24 +297,36 @@ object L1Metadata {
   }
 }
 
-class L1MetaReadReq(implicit p: Parameters) extends L1HellaCacheBundle()(p) {
-  val idx    = UInt(idxBits.W)
-  val way_en = UInt(nWays.W)
-  val tag    = UInt(tagBits.W)
+class L1MetaReadReq(implicit p: Parameters) extends L1HellaCacheBundle()(p) 
+  with CoreFuzzingConstants 
+{
+  val idx     = UInt(idxBits.W)
+  val way_en  = UInt(nWays.W)
+  val tag     = UInt(tagBits.W)
+  // for core fuzzing
+  val ift_tag = UInt(TAG_WIDTH.W)
 }
 
-class L1MetaWriteReq(implicit p: Parameters) extends L1MetaReadReq()(p) {
+class L1MetaWriteReq(implicit p: Parameters) extends L1MetaReadReq()(p) 
+  with CoreFuzzingConstants
+{
   val data = new L1Metadata
+  // for core fuzzing
+  // val ift_tag = UInt(TAG_WIDTH.W)
 }
 
-class L1MetadataArray[T <: L1Metadata](onReset: () => T)(implicit p: Parameters) extends L1HellaCacheModule()(p) {
+class L1MetadataArray[T <: L1Metadata](onReset: () => T)(implicit p: Parameters) extends L1HellaCacheModule()(p)
+  with CoreFuzzingConstants
+  {
   val rstVal = onReset()
   val io = IO(new Bundle {
     val read = Flipped(Decoupled(new L1MetaReadReq))
     val write = Flipped(Decoupled(new L1MetaWriteReq))
     val resp = Output(Vec(nWays, rstVal.cloneType))
   })
-
+  
+  // for core fuzzing
+  val tagger : Any = Module(new Tagger ()(p))
   val rst_cnt = RegInit(0.U(log2Up(nSets+1).W))
   val rst = rst_cnt < nSets.U
   val waddr = Mux(rst, rst_cnt, io.write.bits.idx)
@@ -325,6 +337,9 @@ class L1MetadataArray[T <: L1Metadata](onReset: () => T)(implicit p: Parameters)
 
   val metabits = rstVal.getWidth
   val tag_array = SyncReadMem(nSets, Vec(nWays, UInt(metabits.W)))
+  // for core-fuzzing
+  val ift_tag_array = SyncReadMem(nSets, Vec(nWays, UInt(TAG_WIDTH.W)))
+
   val wen = rst || io.write.valid
   when (wen) {
     tag_array.write(waddr, VecInit.fill(nWays)(wdata), wmask)
