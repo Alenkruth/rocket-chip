@@ -14,10 +14,9 @@ import freechips.rocketchip.amba.AMBAProtField
 import freechips.rocketchip.diplomacy.{IdRange, TransferSizes, RegionType}
 import freechips.rocketchip.tile.{L1CacheParams, HasL1CacheParameters, HasCoreParameters, CoreBundle, HasNonDiplomaticTileParameters, BaseTile, HasTileParameters}
 import freechips.rocketchip.tilelink.{TLMasterParameters, TLClientNode, TLMasterPortParameters, TLEdgeOut, TLWidthWidget, TLFIFOFixer, ClientMetadata}
-import freechips.rocketchip.util.{Code, RandomReplacement, ParameterizedBundle}
+import freechips.rocketchip.util.{Code, RandomReplacement, ParameterizedBundle, CoreFuzzingConstants}
 
 import freechips.rocketchip.util.{BooleanToAugmentedBoolean, IntToAugmentedInt}
-
 import scala.collection.mutable.ListBuffer
 
 case class DCacheParams(
@@ -309,24 +308,36 @@ object L1Metadata {
   }
 }
 
-class L1MetaReadReq(implicit p: Parameters) extends L1HellaCacheBundle()(p) {
-  val idx    = UInt(idxBits.W)
-  val way_en = UInt(nWays.W)
-  val tag    = UInt(tagBits.W)
+class L1MetaReadReq(implicit p: Parameters) extends L1HellaCacheBundle()(p) 
+  with CoreFuzzingConstants 
+{
+  val idx     = UInt(idxBits.W)
+  val way_en  = UInt(nWays.W)
+  val tag     = UInt(tagBits.W)
+  // for core fuzzing
+  val ift_tag = UInt(TAG_WIDTH.W)
 }
 
-class L1MetaWriteReq(implicit p: Parameters) extends L1MetaReadReq()(p) {
+class L1MetaWriteReq(implicit p: Parameters) extends L1MetaReadReq()(p) 
+  with CoreFuzzingConstants
+{
   val data = new L1Metadata
+  // for core fuzzing
+  // val ift_tag = UInt(TAG_WIDTH.W)
 }
 
-class L1MetadataArray[T <: L1Metadata](onReset: () => T)(implicit p: Parameters) extends L1HellaCacheModule()(p) {
+class L1MetadataArray[T <: L1Metadata](onReset: () => T)(implicit p: Parameters) extends L1HellaCacheModule()(p)
+  with CoreFuzzingConstants
+  {
   val rstVal = onReset()
   val io = IO(new Bundle {
     val read = Flipped(Decoupled(new L1MetaReadReq))
     val write = Flipped(Decoupled(new L1MetaWriteReq))
     val resp = Output(Vec(nWays, rstVal.cloneType))
   })
-
+  
+  // for core fuzzing
+  val tagger : Any = Module(new Tagger ()(p))
   val rst_cnt = RegInit(0.U(log2Up(nSets+1).W))
   val rst = rst_cnt < nSets.U
   val waddr = Mux(rst, rst_cnt, io.write.bits.idx)
@@ -337,6 +348,9 @@ class L1MetadataArray[T <: L1Metadata](onReset: () => T)(implicit p: Parameters)
 
   val metabits = rstVal.getWidth
   val tag_array = SyncReadMem(nSets, Vec(nWays, UInt(metabits.W)))
+  // for core-fuzzing
+  val ift_tag_array = SyncReadMem(nSets, Vec(nWays, UInt(TAG_WIDTH.W)))
+
   val wen = rst || io.write.valid
   when (wen) {
     tag_array.write(waddr, VecInit.fill(nWays)(wdata), wmask)
