@@ -45,7 +45,8 @@ case class DCacheParams(
 
   def dataScratchpadBytes: Int = scratch.map(_ => nSets*blockBytes).getOrElse(0)
 
-  def replacement = new RandomReplacement(nWays)
+  // def replacement = new RandomReplacement(nWays)
+  def replacement = new PseudoLRU(nWays)
 
   def silentDrop: Boolean = !acquireBeforeRelease
 

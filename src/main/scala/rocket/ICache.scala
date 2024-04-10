@@ -53,7 +53,7 @@ case class ICacheParams(
     fetchBytes: Int = 4) extends L1CacheParams {
   def tagCode: Code = Code.fromString(tagECC)
   def dataCode: Code = Code.fromString(dataECC)
-  def replacement = new RandomReplacement(nWays)
+  def replacement = new PseudoLRU(nWays)
 }
 
 trait HasL1ICacheParameters extends HasL1CacheParameters with HasCoreParameters {
