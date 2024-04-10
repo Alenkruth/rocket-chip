@@ -328,7 +328,7 @@ class L1MetadataArray[T <: L1Metadata](onReset: () => T)(implicit p: Parameters)
   })
   
   // for core fuzzing
-  val tagger : Any = Module(new Tagger ()(p))
+  // val tagger : Any = Module(new Tagger ()(p))
   val rst_cnt = RegInit(0.U(log2Up(nSets+1).W))
   val rst = rst_cnt < nSets.U
   val waddr = Mux(rst, rst_cnt, io.write.bits.idx)
@@ -340,7 +340,7 @@ class L1MetadataArray[T <: L1Metadata](onReset: () => T)(implicit p: Parameters)
   val metabits = rstVal.getWidth
   val tag_array = SyncReadMem(nSets, Vec(nWays, UInt(metabits.W)))
   // for core-fuzzing
-  val ift_tag_array = SyncReadMem(nSets, Vec(nWays, UInt(TAG_WIDTH.W)))
+  // val ift_tag_array = SyncReadMem(nSets, Vec(nWays, UInt(TAG_WIDTH.W)))
 
   val wen = rst || io.write.valid
   when (wen) {
