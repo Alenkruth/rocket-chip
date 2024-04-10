@@ -304,7 +304,8 @@ class L1MetaReadReq(implicit p: Parameters) extends L1HellaCacheBundle()(p)
   val way_en  = UInt(nWays.W)
   val tag     = UInt(tagBits.W)
   // for core fuzzing
-  val ift_tag = UInt(TAG_WIDTH.W)
+  // commenting the IFT tag for now since it breaks the compilation
+  // val ift_tag = UInt(TAG_WIDTH.W)
 }
 
 class L1MetaWriteReq(implicit p: Parameters) extends L1MetaReadReq()(p) 
