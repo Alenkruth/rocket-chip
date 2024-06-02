@@ -18,6 +18,8 @@ class CustomCSRIO(implicit p: Parameters) extends CoreBundle {
   val value = UInt(xLen.W)
 }
 
+// place to begin creation of CSR for fetch-buffer sizes - alex
+
 class CustomCSRs(implicit p: Parameters) extends CoreBundle {
   // Not all cores have these CSRs, but those that do should follow the same
   // numbering conventions.  So we list them here but default them to None.
