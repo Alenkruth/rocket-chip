@@ -34,8 +34,12 @@ class CustomCSRs(implicit p: Parameters) extends CoreBundle {
   protected def fetch_bufferCSRId = 0x7c3
   protected def fetch_bufferCSR: Option[CustomCSR] = None
 
+  // CSR for changing the sizes of load/store queues - alex
+  protected def ldq_stq_CSRId = 0x7c4
+  protected def ldq_stq_CSR: Option[CustomCSR] = None
+
   // If you override this, you'll want to concatenate super.decls
-  def decls: Seq[CustomCSR] = bpmCSR.toSeq ++ chickenCSR ++ configureCSR ++ fetch_bufferCSR
+  def decls: Seq[CustomCSR] = bpmCSR.toSeq ++ chickenCSR ++ configureCSR ++ fetch_bufferCSR ++ ldq_stq_CSR
 
   val csrs = Vec(decls.size, new CustomCSRIO)
 
