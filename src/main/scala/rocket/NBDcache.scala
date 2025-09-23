@@ -26,6 +26,16 @@ class L1DataWriteReq(implicit p: Parameters) extends L1DataReadReq()(p) {
   val data   = Bits(encRowBits.W)
 }
 
+class L1DataReadReqCF(implicit p: Parameters) extends L1HellaCacheBundle()(p) {
+  val way_en = Bits(nWays.W)
+  // val addr   = Bits(untagBits.W)
+  val addr   = Bits(coreMaxAddrBits.W)
+}
+
+class L1DataWriteReqCF(implicit p: Parameters) extends L1DataReadReqCF()(p) {
+  val wmask  = Bits(rowWords.W)
+  val data   = Bits(encRowBits.W)
+}
 class L1RefillReq(implicit p: Parameters) extends L1DataReadReq()(p)
 
 class Replay(implicit p: Parameters) extends HellaCacheReqInternal()(p) with HasCoreData
@@ -46,7 +56,6 @@ class WritebackReq(params: TLBundleParameters)(implicit p: Parameters) extends L
   val param = UInt(TLPermissions.cWidth.W) 
   val way_en = Bits(nWays.W)
   val voluntary = Bool()
-
 }
 
 class IOMSHR(id: Int)(implicit edge: TLEdgeOut, p: Parameters) extends L1HellaCacheModule()(p) {
