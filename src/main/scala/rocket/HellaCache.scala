@@ -297,26 +297,55 @@ object L1Metadata {
     meta
   }
 }
+class L1MetadataCF(implicit p: Parameters) extends L1HellaCacheBundle()(p) 
+  with CoreFuzzingConstants 
+{
+  val coh = new ClientMetadata
+  val tag = UInt(tagBits.W)
+  val ift_tag_cf= UInt(iftTagWidth.W)
+}
+
+object L1MetadataCF {
+  def apply(tag: Bits, coh: ClientMetadata, ift_tag_cf: Bits)(implicit p: Parameters) = {
+    val meta = Wire(new L1MetadataCF)
+    meta.tag := tag
+    meta.coh := coh
+    meta.ift_tag_cf := ift_tag_cf
+    meta
+  }
+}
 
 class L1MetaReadReq(implicit p: Parameters) extends L1HellaCacheBundle()(p) 
+{
+  val idx     = UInt(idxBits.W)
+  val way_en  = UInt(nWays.W)
+  val tag     = UInt(tagBits.W)
+}
+
+class L1MetaWriteReq(implicit p: Parameters) extends L1MetaReadReq()(p) 
+{
+  val data = new L1Metadata
+}
+
+class L1MetaReadReqCF(implicit p: Parameters) extends L1HellaCacheBundle()(p) 
   with CoreFuzzingConstants 
 {
   val idx     = UInt(idxBits.W)
   val way_en  = UInt(nWays.W)
   val tag     = UInt(tagBits.W)
+  val addr    = UInt(coreMaxAddrBits.W)
   // for core fuzzing
   // commenting the IFT tag for now since it breaks the compilation
   // val ift_tag = UInt(TAG_WIDTH.W)
 }
 
-class L1MetaWriteReq(implicit p: Parameters) extends L1MetaReadReq()(p) 
+class L1MetaWriteReqCF(implicit p: Parameters) extends L1MetaReadReq()(p) 
   with CoreFuzzingConstants
 {
   val data = new L1Metadata
   // for core fuzzing
   // val ift_tag = UInt(TAG_WIDTH.W)
 }
-
 class L1MetadataArray[T <: L1Metadata](onReset: () => T)(implicit p: Parameters) extends L1HellaCacheModule()(p)
   with CoreFuzzingConstants
   {
@@ -324,6 +353,41 @@ class L1MetadataArray[T <: L1Metadata](onReset: () => T)(implicit p: Parameters)
   val io = IO(new Bundle {
     val read = Flipped(Decoupled(new L1MetaReadReq))
     val write = Flipped(Decoupled(new L1MetaWriteReq))
+    val resp = Output(Vec(nWays, rstVal.cloneType))
+  })
+  
+  // for core fuzzing
+  // val tagger : Any = Module(new Tagger ()(p))
+  val rst_cnt = RegInit(0.U(log2Up(nSets+1).W))
+  val rst = rst_cnt < nSets.U
+  val waddr = Mux(rst, rst_cnt, io.write.bits.idx)
+  val wdata = Mux(rst, rstVal, io.write.bits.data).asUInt
+  val wmask = Mux(rst || (nWays == 1).B, (-1).S, io.write.bits.way_en.asSInt).asBools
+  val rmask = Mux(rst || (nWays == 1).B, (-1).S, io.read.bits.way_en.asSInt).asBools
+  when (rst) { rst_cnt := rst_cnt+1.U }
+
+  val metabits = rstVal.getWidth
+  val tag_array = SyncReadMem(nSets, Vec(nWays, UInt(metabits.W)))
+  // for core-fuzzing
+  // val ift_tag_array = SyncReadMem(nSets, Vec(nWays, UInt(TAG_WIDTH.W)))
+
+  val wen = rst || io.write.valid
+  when (wen) {
+    tag_array.write(waddr, VecInit.fill(nWays)(wdata), wmask)
+  }
+  io.resp := tag_array.read(io.read.bits.idx, io.read.fire()).map(_.asTypeOf(chiselTypeOf(rstVal)))
+
+  io.read.ready := !wen // so really this could be a 6T RAM
+  io.write.ready := !rst
+}
+
+class L1MetadataArrayCF[T <: L1MetadataCF](onReset: () => T)(implicit p: Parameters) extends L1HellaCacheModule()(p)
+  with CoreFuzzingConstants
+  {
+  val rstVal = onReset()
+  val io = IO(new Bundle {
+    val read = Flipped(Decoupled(new L1MetaReadReqCF))
+    val write = Flipped(Decoupled(new L1MetaWriteReqCF))
     val resp = Output(Vec(nWays, rstVal.cloneType))
   })
   
