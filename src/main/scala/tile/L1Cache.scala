@@ -28,15 +28,18 @@ trait HasL1CacheParameters extends HasTileParameters {
   def nWays = cacheParams.nWays
   def wayBits = log2Up(nWays)
   def isDM = nWays == 1
-  def rowBits = cacheParams.rowBits
+  def rowBits = cacheParams.rowBits // 128 for GigaBoom
   def rowBytes = rowBits/8
   def rowOffBits = log2Up(rowBytes)
   def nTLBSets = cacheParams.nTLBSets
   def nTLBWays = cacheParams.nTLBWays
 
-  def cacheDataBits = cacheParams.rowBits
+  // def cacheDataBits = tlBundleParams.dataBits // I am Assuming it is 8 -- old corefuzzing comment
+
+  def cacheDataBits = cacheParams.rowBits // from newer rocket merge (needs checking)
+
   def cacheDataBytes = cacheDataBits / 8
-  def cacheDataBeats = (cacheBlockBytes * 8) / cacheDataBits
+  def cacheDataBeats = (cacheBlockBytes * 8) / cacheDataBits // cacheBlockBytes - 64
   def refillCycles = cacheDataBeats
 }
 

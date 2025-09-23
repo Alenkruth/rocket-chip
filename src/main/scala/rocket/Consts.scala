@@ -90,3 +90,21 @@ trait MemoryOpConstants {
   def isWrite(cmd: UInt) = cmd === M_XWR || cmd === M_PWR || cmd === M_XSC || isAMO(cmd)
   def isWriteIntent(cmd: UInt) = isWrite(cmd) || cmd === M_PFW || cmd === M_XLR
 }
+
+// consts for CoreFuzzing - AK
+
+/*trait CoreFuzzingConstants
+{
+  // number of bits used as tag for IFT
+  val IFT_BITS = 1
+
+  // protected address range
+  // 2c10 - 2c40 for the boom attack test
+  // for hello world, the range was 80001060 to 80001080
+  val IFT_PROTECTED_START = 0x80002c10L //.S(48.W).asUInt // for the hello world example
+  val IFT_PROTECTED_END = 0x80002c40L //.S(48.W).asUInt // will this work?
+  //val IFT_PROTECTED_END = Wire(chiselTypeOf("h080001080".U(48.W))) // we are hardcoding the width to 48 (sv48 at most)
+
+  // val IFT_PROTECTED_START = 0x80001206L // start of victim function in condbranchmispred
+  // val IFT_PROTECTED_END = 0x800012acL // end of victim function in condbranchmispred
+}*/

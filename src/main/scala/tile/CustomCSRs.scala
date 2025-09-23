@@ -33,8 +33,65 @@ class CustomCSRs(implicit p: Parameters) extends CoreBundle {
   protected def chickenCSRId = 0x7c1
   protected def chickenCSR: Option[CustomCSR] = None
 
+  // CSRs for Core Fuzzing
+  protected def bpdCSRIdCF = 0x7c2
+  protected def bpdCSRCF: Option[CustomCSR] = None
+
+  // CSR 7c2 needs to be moved within 0xbc0 and 0xbff
+  // 0xbc0 - 0xbff has 64 CSRs and they should be sufficient for configuration CSRs
+
+  // cf_dcache_csr
+  // id : 0xbc0
+  // 0-7 : Sets  (Default - bit 0 - 128; bit 1 - 32; bit 2 - 64)
+  // 8-15 : Ways (Default - bit 0 - 16; bit 1 - 1; bit 2 - 2; bit 3 - 4; bit 4 - 8)
+  // 16-23 : size (Default - bit 0 - 128; bit 1 - 2; bit 2 - 4; bit 3 - 8; bit 4 - 16; bit 5 - 32; bit 6 - 64)
+  // would need to add rowBit reconfiguration - currently fixed to 16B per access, support 8B
+  // 24-31 : replacement policy (Default - bit 0 - PseudoLRU, bit 1 - Random)
+  protected def dcacheCSRIdCF = 0xbc1
+  protected def dcacheCSRCF: Option[CustomCSR] = None
+
+  // CSR cf_debug_log 
+  // id : 0xbc1
+  // 0 - Core  Fuzzing debug enable
+  // 1 - Dcache logs
+  // 2 - LSU logs
+  // 3 - Core logs
+  // 4 - ROB logs
+  // 5 - BPD logs
+  // 6 - frontend logs
+  protected def debugCSRIdCF = 0xbc0
+  protected def debugCSRCF: Option[CustomCSR] = None 
+
+  // Add a CSR for ROB size reconfiguration
+  // CSR for ROB size reconfiguration (one-hot encoding)
+  protected def robSizeCSRIdCF = 0xbc2
+  protected def robSizeCSRCF: Option[CustomCSR] = None
+
+  // CSR for cache block size reconfiguration (unsigned integer)
+  protected def cacheBlockSizeCSRIdCF = 0xbc3
+  protected def cacheBlockSizeCSRCF: Option[CustomCSR] = None
+
+  // CSR for core width reconfiguration (one-hot encoding)
+  // protected def coreWidthCSRId = 0xbc3
+  // protected def coreWidthCSR: Option[CustomCSR] = {
+  //  val mask = boom.common.coreWidthOptionsMask
+  //  val init = BigInt(1 << 4) // Default: width 5
+  //  Some(CustomCSR(coreWidthCSRId, mask, Some(init)))
+  // }
+
+  // Alex-Corefuzzing
+  // CSR for changing the size of the fetch-buffer - alex
+  protected def fetchBufferCSRIdCF = 0x7c3
+  protected def fetchBufferCSRCF: Option[CustomCSR] = None
+
+  // CSR for changing the sizes of load/store queues - alex
+  protected def ldqStqCSRIdCF = 0x7c4
+  protected def ldqStqCSRCF: Option[CustomCSR] = None
+
   // If you override this, you'll want to concatenate super.decls
-  def decls: Seq[CustomCSR] = bpmCSR.toSeq ++ chickenCSR
+  def decls: Seq[CustomCSR] = bpmCSR.toSeq ++ chickenCSR ++ bpdCSRCF ++
+                              dcacheCSRCF ++ debugCSRCF ++ robSizeCSRCF ++
+                              cacheBlockSizeCSRCF ++ fetchBufferCSRCF ++ ldqStqCSRCF // ++ coreWidthCSR
 
   val csrs = Vec(decls.size, new CustomCSRIO)
 
