@@ -4,9 +4,13 @@ package freechips.rocketchip.tilelink
 
 import chisel3._
 import chisel3.util._
-import org.chipsalliance.cde.config.Parameters
-import freechips.rocketchip.diplomacy._
-import freechips.rocketchip.util._
+
+import org.chipsalliance.cde.config._
+import org.chipsalliance.diplomacy.lazymodule._
+
+import freechips.rocketchip.util.{CRC, UIntToOH1}
+
+import freechips.rocketchip.util.DataToAugmentedData
 
 // We detect concurrent puts that put memory into an undefined state.
 // put0, put0Ack, put1, put1Ack => ok: defined
@@ -345,11 +349,11 @@ object TLRAMModel
 
   case class MonitorParameters(addressBits: Int, sizeBits: Int)
 
-  class ByteMonitor(params: MonitorParameters) extends GenericParameterizedBundle(params) {
+  class ByteMonitor(val params: MonitorParameters) extends Bundle {
     val valid = Bool()
     val value = UInt(8.W)
   }
-  class FlightMonitor(params: MonitorParameters) extends GenericParameterizedBundle(params) {
+  class FlightMonitor(val params: MonitorParameters) extends Bundle {
     val base    = UInt(params.addressBits.W)
     val size    = UInt(params.sizeBits.W)
     val opcode  = UInt(3.W)

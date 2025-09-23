@@ -5,12 +5,18 @@ package freechips.rocketchip.tile
 
 import chisel3._
 import chisel3.util._
-import chisel3.util.HasBlackBoxResource
 import chisel3.experimental.IntParam
+
 import org.chipsalliance.cde.config._
-import freechips.rocketchip.diplomacy._
-import freechips.rocketchip.rocket._
-import freechips.rocketchip.tilelink._
+import org.chipsalliance.diplomacy.lazymodule._
+
+import freechips.rocketchip.rocket.{
+  MStatus, HellaCacheIO, TLBPTWIO, CanHavePTW, CanHavePTWModule,
+  SimpleHellaCacheIF, M_XRD, PTE, PRV, M_SZ
+}
+import freechips.rocketchip.tilelink.{
+  TLNode, TLIdentityNode, TLClientNode, TLMasterParameters, TLMasterPortParameters
+}
 import freechips.rocketchip.util.InOrderArbiter
 
 case object BuildRoCC extends Field[Seq[Parameters => LazyRoCC]](Nil)
@@ -45,7 +51,7 @@ class RoCCCoreIO(val nRoCCCSRs: Int = 0)(implicit p: Parameters) extends CoreBun
   val busy = Output(Bool())
   val interrupt = Output(Bool())
   val exception = Input(Bool())
-  val csrs = Input(Vec(nRoCCCSRs, new CustomCSRIO))
+  val csrs = Flipped(Vec(nRoCCCSRs, new CustomCSRIO))
 }
 
 class RoCCIO(val nPTWPorts: Int, nRoCCCSRs: Int)(implicit p: Parameters) extends RoCCCoreIO(nRoCCCSRs)(p) {
@@ -65,10 +71,12 @@ abstract class LazyRoCC(
   require(roccCSRs.map(_.id).toSet.size == roccCSRs.size)
   val atlNode: TLNode = TLIdentityNode()
   val tlNode: TLNode = TLIdentityNode()
+  val stlNode: TLNode = TLIdentityNode()
 }
 
 class LazyRoCCModuleImp(outer: LazyRoCC) extends LazyModuleImp(outer) {
   val io = IO(new RoCCIO(outer.nPTWPorts, outer.roccCSRs.size))
+  io := DontCare
 }
 
 /** Mixins for including RoCC **/
@@ -80,13 +88,14 @@ trait HasLazyRoCC extends CanHavePTW { this: BaseTile =>
     "LazyRoCC instantiations require overlapping CSRs")
   roccs.map(_.atlNode).foreach { atl => tlMasterXbar.node :=* atl }
   roccs.map(_.tlNode).foreach { tl => tlOtherMastersNode :=* tl }
+  roccs.map(_.stlNode).foreach { stl => stl :*= tlSlaveXbar.node }
 
   nPTWPorts += roccs.map(_.nPTWPorts).sum
   nDCachePorts += roccs.size
 }
 
 trait HasLazyRoCCModule extends CanHavePTWModule
-    with HasCoreParameters { this: RocketTileModuleImp with HasFpuOpt =>
+    with HasCoreParameters { this: RocketTileModuleImp =>
 
   val (respArb, cmdRouter) = if(outer.roccs.nonEmpty) {
     val respArb = Module(new RRArbiter(new RoCCResponse()(outer.p), outer.roccs.size))
@@ -98,23 +107,6 @@ trait HasLazyRoCCModule extends CanHavePTWModule
       dcIF.io.requestor <> rocc.module.io.mem
       dcachePorts += dcIF.io.cache
       respArb.io.in(i) <> Queue(rocc.module.io.resp)
-    }
-
-    fpuOpt foreach { fpu =>
-      val nFPUPorts = outer.roccs.count(_.usesFPU)
-      if (usingFPU && nFPUPorts > 0) {
-        val fpArb = Module(new InOrderArbiter(new FPInput()(outer.p), new FPResult()(outer.p), nFPUPorts))
-        val fp_rocc_ios = outer.roccs.filter(_.usesFPU).map(_.module.io)
-        fpArb.io.in_req <> fp_rocc_ios.map(_.fpu_req)
-        fp_rocc_ios.zip(fpArb.io.in_resp).foreach {
-          case (rocc, arb) => rocc.fpu_resp <> arb
-        }
-        fpu.io.cp_req <> fpArb.io.out_req
-        fpArb.io.out_resp <> fpu.io.cp_resp
-      } else {
-        fpu.io.cp_req.valid := false.B
-        fpu.io.cp_resp.ready := false.B
-      }
     }
     (Some(respArb), Some(cmdRouter))
   } else {
@@ -146,7 +138,7 @@ class AccumulatorExampleModuleImp(outer: AccumulatorExample)(implicit p: Paramet
   val accum = regfile(addr)
   val wdata = Mux(doWrite, addend, accum + addend)
 
-  when (cmd.fire() && (doWrite || doAccum)) {
+  when (cmd.fire && (doWrite || doAccum)) {
     regfile(addr) := wdata
   }
 
@@ -156,7 +148,7 @@ class AccumulatorExampleModuleImp(outer: AccumulatorExample)(implicit p: Paramet
   }
 
   // control
-  when (io.mem.req.fire()) {
+  when (io.mem.req.fire) {
     busy(addr) := true.B
   }
 
@@ -192,6 +184,7 @@ class AccumulatorExampleModuleImp(outer: AccumulatorExample)(implicit p: Paramet
   io.mem.req.bits.phys := false.B
   io.mem.req.bits.dprv := cmd.bits.status.dprv
   io.mem.req.bits.dv := cmd.bits.status.dv
+  io.mem.req.bits.no_resp := false.B
 }
 
 class  TranslatorExample(opcodes: OpcodeSet)(implicit p: Parameters) extends LazyRoCC(opcodes, nPTWPorts = 1) {
@@ -211,7 +204,7 @@ class TranslatorExampleModuleImp(outer: TranslatorExample)(implicit p: Parameter
 
   io.cmd.ready := (state === s_idle)
 
-  when (io.cmd.fire()) {
+  when (io.cmd.fire) {
     req_rd := io.cmd.bits.inst.rd
     req_addr := io.cmd.bits.rs1
     state := s_ptw_req
@@ -219,14 +212,14 @@ class TranslatorExampleModuleImp(outer: TranslatorExample)(implicit p: Parameter
 
   private val ptw = io.ptw(0)
 
-  when (ptw.req.fire()) { state := s_ptw_resp }
+  when (ptw.req.fire) { state := s_ptw_resp }
 
   when (state === s_ptw_resp && ptw.resp.valid) {
     pte := ptw.resp.bits.pte
     state := s_resp
   }
 
-  when (io.resp.fire()) { state := s_idle }
+  when (io.resp.fire) { state := s_idle }
 
   ptw.req.valid := (state === s_ptw_req)
   ptw.req.bits.valid := true.B
@@ -295,7 +288,7 @@ class CharacterCountExampleModuleImp(outer: CharacterCountExample)(implicit p: P
                        lgSize = lgCacheBlockBytes.U)._2
   tl_out.d.ready := (state === s_gnt)
 
-  when (io.cmd.fire()) {
+  when (io.cmd.fire) {
     addr := io.cmd.bits.rs1
     needle := io.cmd.bits.rs2
     resp_rd := io.cmd.bits.inst.rd
@@ -304,9 +297,9 @@ class CharacterCountExampleModuleImp(outer: CharacterCountExample)(implicit p: P
     state := s_acq
   }
 
-  when (tl_out.a.fire()) { state := s_gnt }
+  when (tl_out.a.fire) { state := s_gnt }
 
-  when (tl_out.d.fire()) {
+  when (tl_out.d.fire) {
     recv_beat := recv_beat + 1.U
     recv_data := gnt.data
     state := s_check
@@ -326,7 +319,7 @@ class CharacterCountExampleModuleImp(outer: CharacterCountExample)(implicit p: P
     }
   }
 
-  when (io.resp.fire()) { state := s_idle }
+  when (io.resp.fire) { state := s_idle }
 
   io.busy := (state =/= s_idle)
   io.interrupt := false.B
@@ -406,11 +399,11 @@ object OpcodeSet {
 
 class RoccCommandRouter(opcodes: Seq[OpcodeSet])(implicit p: Parameters)
     extends CoreModule()(p) {
-  val io = new Bundle {
+  val io = IO(new Bundle {
     val in = Flipped(Decoupled(new RoCCCommand))
     val out = Vec(opcodes.size, Decoupled(new RoCCCommand))
     val busy = Output(Bool())
-  }
+  })
 
   val cmd = Queue(io.in)
   val cmdReadys = io.out.zip(opcodes).map { case (out, opcode) =>

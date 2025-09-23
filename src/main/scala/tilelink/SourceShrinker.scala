@@ -4,9 +4,14 @@ package freechips.rocketchip.tilelink
 
 import chisel3._
 import chisel3.util._
-import org.chipsalliance.cde.config.Parameters
-import freechips.rocketchip.diplomacy._
-import freechips.rocketchip.util._
+
+import org.chipsalliance.cde.config._
+import org.chipsalliance.diplomacy.lazymodule._
+
+import freechips.rocketchip.diplomacy.IdRange
+import freechips.rocketchip.util.leftOR
+
+import freechips.rocketchip.util.DataToAugmentedData
 
 class TLSourceShrinker(maxInFlight: Int)(implicit p: Parameters) extends LazyModule
 {
@@ -34,10 +39,6 @@ class TLSourceShrinker(maxInFlight: Int)(implicit p: Parameters) extends LazyMod
   lazy val module = new Impl
   class Impl extends LazyModuleImp(this) {
     node.in.zip(node.out).foreach { case ((in, edgeIn), (out, edgeOut)) =>
-      // Acquires cannot pass this adapter; it makes Probes impossible
-      require (!edgeIn.client.anySupportProbe || 
-               !edgeOut.manager.anySupportAcquireB)
-
       out.b.ready := true.B
       out.c.valid := false.B
       out.e.valid := false.B
@@ -49,6 +50,10 @@ class TLSourceShrinker(maxInFlight: Int)(implicit p: Parameters) extends LazyMod
         out.a <> in.a
         in.d <> out.d
       } else {
+        // Acquires cannot pass this adapter; it makes Probes impossible
+        require (!edgeIn.client.anySupportProbe ||
+                 !edgeOut.manager.anySupportAcquireB)
+
         // State tracking
         val sourceIdMap = Mem(maxInFlight, UInt(edgeIn.bundle.sourceBits.W))
         val allocated = RegInit(0.U(maxInFlight.W))
