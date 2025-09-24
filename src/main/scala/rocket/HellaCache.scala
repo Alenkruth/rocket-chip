@@ -14,7 +14,7 @@ import freechips.rocketchip.amba.AMBAProtField
 import freechips.rocketchip.diplomacy.{IdRange, TransferSizes, RegionType}
 import freechips.rocketchip.tile.{L1CacheParams, HasL1CacheParameters, HasCoreParameters, CoreBundle, HasNonDiplomaticTileParameters, BaseTile, HasTileParameters}
 import freechips.rocketchip.tilelink.{TLMasterParameters, TLClientNode, TLMasterPortParameters, TLEdgeOut, TLWidthWidget, TLFIFOFixer, ClientMetadata}
-import freechips.rocketchip.util.{Code, RandomReplacement, ParameterizedBundle, CoreFuzzingConstants}
+import freechips.rocketchip.util.{Code, RandomReplacement, PseudoLRU, ParameterizedBundle, CoreFuzzingConstants}
 
 import freechips.rocketchip.util.{BooleanToAugmentedBoolean, IntToAugmentedInt}
 import scala.collection.mutable.ListBuffer
@@ -421,7 +421,7 @@ class L1MetadataArrayCF[T <: L1MetadataCF](onReset: () => T)(implicit p: Paramet
   when (wen) {
     tag_array.write(waddr, VecInit.fill(nWays)(wdata), wmask)
   }
-  io.resp := tag_array.read(io.read.bits.idx, io.read.fire()).map(_.asTypeOf(chiselTypeOf(rstVal)))
+  io.resp := tag_array.read(io.read.bits.idx, io.read.fire).map(_.asTypeOf(chiselTypeOf(rstVal)))
 
   io.read.ready := !wen // so really this could be a 6T RAM
   io.write.ready := !rst
