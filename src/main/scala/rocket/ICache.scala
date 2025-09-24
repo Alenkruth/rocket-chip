@@ -17,7 +17,7 @@ import freechips.rocketchip.diplomacy.{IdRange, AddressSet, RegionType, Transfer
 import freechips.rocketchip.resources.{SimpleDevice, ResourceBindings, Binding, ResourceAddress, Description, ResourceString, ResourceValue}
 import freechips.rocketchip.tile.{L1CacheParams, HasL1CacheParameters, HasCoreParameters, CoreBundle, TileKey, LookupByHartId}
 import freechips.rocketchip.tilelink.{TLClientNode, TLMasterPortParameters, TLManagerNode, TLSlavePortParameters, TLSlaveParameters, TLMasterParameters, TLHints}
-import freechips.rocketchip.util.{Code, CanHaveErrors, DescribedSRAM, RandomReplacement, Split, IdentityCode, property}
+import freechips.rocketchip.util.{Code, CanHaveErrors, DescribedSRAM, RandomReplacement, Split, IdentityCode, property, PseudoLRU}
 
 import freechips.rocketchip.util.BooleanToAugmentedBoolean
 import freechips.rocketchip.util.UIntToAugmentedUInt
