@@ -79,10 +79,24 @@ class CustomCSRs(implicit p: Parameters) extends CoreBundle {
   //  Some(CustomCSR(coreWidthCSRId, mask, Some(init)))
   // }
 
+    // Alex-Corefuzzing
+  // CSR for changing the size of the fetch-buffer - alex
+  protected def fetchBufferCSRIdCF = 0x7c3
+  protected def fetchBufferCSRCF: Option[CustomCSR] = None
+
+  // CSR for changing the sizes of load/store queues - alex
+  protected def ldqStqCSRIdCF = 0x7c4
+  protected def ldqStqCSRCF: Option[CustomCSR] = None
+
   // If you override this, you'll want to concatenate super.decls
   def decls: Seq[CustomCSR] = bpmCSR.toSeq ++ chickenCSR ++ bpdCSRCF ++
                               dcacheCSRCF ++ debugCSRCF ++ robSizeCSRCF ++
-                              cacheBlockSizeCSRCF // ++ coreWidthCSR
+                              cacheBlockSizeCSRCF ++ fetchBufferCSRCF ++ ldqStqCSRCF // ++ coreWidthCSR
+
+  // If you override this, you'll want to concatenate super.decls
+  //def decls: Seq[CustomCSR] = bpmCSR.toSeq ++ chickenCSR ++ bpdCSRCF ++
+  //                            dcacheCSRCF ++ debugCSRCF ++ robSizeCSRCF ++
+  //                            cacheBlockSizeCSRCF // ++ coreWidthCSR
 
   val csrs = Vec(decls.size, new CustomCSRIO)
 

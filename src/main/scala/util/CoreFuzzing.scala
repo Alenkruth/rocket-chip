@@ -10,7 +10,14 @@ import org.chipsalliance.cde.config._
 trait CoreFuzzingConstants{
     // Bits used to store the TAG
     val iftTagWidth = 1
-    
+
+    // counter for uops
+    val uopIDCounterWidthCF = 8
+
+    // tainting info for uops
+    val moduleCountCF = 4 // we will probably have 16 modules tops
+    val taintTypeCf = 2 // we have 4 types of taints
+
     // Bit widths of reconfiguration control wires
     // we support 4 parameter reconfiguration and each field is 8 bit wide
     val dcacheParamsWidthCF = 8 
@@ -23,7 +30,7 @@ trait CoreFuzzingConstants{
     
     // custom ROB entry options
     // 130 is the default ROB size
-    val robEntryOptions = Seq(130, 16, 20, 30, 32, 40, 50, 64, 80, 90, 96, 128, 150, 256)
+    def robEntryOptions = Seq(130, 16, 20, 30, 32, 40, 50, 64, 80, 90, 96, 128, 150, 250)
     val setOptions = Seq(128, 32, 64)
     val wayOptions = Seq(16, 1, 2, 4, 8)
     val sizeOptions = Seq(128, 2, 4, 8, 16, 32, 64)
