@@ -30,7 +30,8 @@ trait CoreFuzzingConstants{
     
     // custom ROB entry options
     // 130 is the default ROB size
-    def robEntryOptions = Seq(130, 16, 20, 30, 32, 40, 50, 64, 80, 90, 96, 128, 150, 250)
+    // def robEntryOptions = Seq(130, 16, 20, 30, 32, 40, 50, 64, 80, 90, 96, 128, 150, 250)
+    def robEntryOptions = Seq(250, 16, 20, 30, 32, 40, 50, 64, 80, 90, 96, 128, 130, 150, 200)
     val setOptions = Seq(128, 32, 64)
     val wayOptions = Seq(16, 1, 2, 4, 8)
     val sizeOptions = Seq(128, 2, 4, 8, 16, 32, 64)
