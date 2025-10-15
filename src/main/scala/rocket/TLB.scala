@@ -403,7 +403,7 @@ class TLB(instruction: Boolean, lgMaxSize: Int, cfg: TLBConfig)(implicit edge: T
   val vsatp_mode_mismatch  = priv_v && (vstage1_en =/= v_entries_use_stage1) && !io.req.bits.passthrough
 
   // share a single physical memory attribute checker (unshare if critical path)
-  val refill_ppn = io.ptw.resp.bits.pte.ppn(ppnBits-1, 0)
+  val refill_ppn = if (usingVM) io.ptw.resp.bits.pte.ppn(ppnBits-1, 0) else 0.U
   /** refill signal */
   val do_refill = usingVM.B && io.ptw.resp.valid
   /** sfence invalidate refill */
@@ -583,7 +583,7 @@ class TLB(instruction: Boolean, lgMaxSize: Int, cfg: TLBConfig)(implicit edge: T
     Mux(cmd_lrsc, ~lrscAllowed, 0.U)
 
   // access exception needs SoC information from PMA
-  val ae_ld_array = Mux(cmd_read, ae_array | ~pr_array, 0.U)
+  val ae_ld_array = Mux(cmd_read, ae_array | ~Mux(cmd_readx, pr_array & px_array, pr_array), 0.U)
   val ae_st_array =
     Mux(cmd_write_perms, ae_array | ~pw_array, 0.U) |
     Mux(cmd_put_partial, ~ppp_array_if_cached, 0.U) |

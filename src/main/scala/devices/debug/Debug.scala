@@ -19,7 +19,7 @@ import freechips.rocketchip.regmapper.{RegField, RegFieldAccessType, RegFieldDes
 import freechips.rocketchip.rocket.{CSRs, Instructions}
 import freechips.rocketchip.tile.MaxHartIdBits
 import freechips.rocketchip.tilelink.{TLAsyncCrossingSink, TLAsyncCrossingSource, TLBuffer, TLRegisterNode, TLXbar}
-import freechips.rocketchip.util.{Annotated, AsyncBundle, AsyncQueueParams, AsyncResetSynchronizerShiftReg, FromAsyncBundle, ParameterizedBundle, ResetSynchronizerShiftReg, ToAsyncBundle}
+import freechips.rocketchip.util.{AsyncBundle, AsyncQueueParams, AsyncResetSynchronizerShiftReg, FromAsyncBundle, ParameterizedBundle, ResetSynchronizerShiftReg, ToAsyncBundle}
 
 import freechips.rocketchip.util.SeqBoolBitwiseOps
 import freechips.rocketchip.util.SeqToAugmentedSeq
@@ -660,7 +660,7 @@ class TLDebugModuleOuter(device: Device)(implicit p: Parameters) extends LazyMod
       val hartResetReg = RegNext(next=hartResetNxt, init=0.U.asTypeOf(hartResetNxt))
 
       for (component <- 0 until nComponents) {
-        hartResetNxt(component) := DMCONTROLReg.hartreset & hartSelected(component)
+        hartResetNxt(component) := DMCONTROLNxt.hartreset & hartSelected(component)
         io.hartResetReq.get(component) := hartResetReg(component)
       }
     }
@@ -789,7 +789,6 @@ class TLDebugModuleInner(device: Device, getNComponents: () => Int, beatBytes: I
   lazy val module = new Impl
   class Impl extends LazyModuleImp(this){
     val nComponents = getNComponents()
-    Annotated.params(this, cfg)
     val supportHartArray = cfg.supportHartArray & (nComponents > 1)
     val nExtTriggers = cfg.nExtTriggers
     val nHaltGroups = if ((nComponents > 1) | (nExtTriggers > 0)) cfg.nHaltGroups
@@ -1125,12 +1124,12 @@ class TLDebugModuleInner(device: Device, getNComponents: () => Int, beatBytes: I
       }
 
       for (hg <- 1 to nHaltGroups) {
-        hgHartFiring(hg) := hartHaltedWrEn & ~haltedBitRegs(hartHaltedId) & (hgParticipateHart(hartSelFuncs.hartIdToHartSel(hartHaltedId)) === hg.U)
+        hgHartFiring(hg) := hartHaltedWrEn & ~haltedBitRegs(hartSelFuncs.hartIdToHartSel(hartHaltedId)) & (hgParticipateHart(hartSelFuncs.hartIdToHartSel(hartHaltedId)) === hg.U)
         hgHartsAllHalted(hg) := (haltedBitRegs.asBools | hgParticipateHart.map(_ =/= hg.U)).reduce(_ & _)
 
         when (~io.dmactive || ~dmAuthenticated) {
           hgFired(hg) := false.B
-        }.elsewhen (~hgFired(hg) & (hgHartFiring(hg) | hgTrigFiring(hg))) {
+        }.elsewhen (~hgFired(hg) & ~hgHartsAllHalted(hg) & (hgHartFiring(hg) | hgTrigFiring(hg))) {
           hgFired(hg) := true.B
         }.elsewhen ( hgFired(hg) & hgHartsAllHalted(hg) & hgTrigsAllAcked(hg)) {
           hgFired(hg) := false.B

@@ -25,6 +25,9 @@ trait CoreParams {
   val vectorUseDCache: Boolean = false
   val useRVE: Boolean
   val useConditionalZero: Boolean
+  val useZba: Boolean
+  val useZbb: Boolean
+  val useZbs: Boolean
   val mulDiv: Option[MulDivParams]
   val fpu: Option[FPUParams]
   val fetchWidth: Int
@@ -69,8 +72,11 @@ trait CoreParams {
   def eLen: Int = 0
   def vfLen: Int = 0
   def vfh: Boolean = false
+  def vExts: Seq[String] = Nil
   def hasV: Boolean = vLen >= 128 && eLen >= 64 && vfLen >= 64
   def vMemDataBits: Int = 0
+
+  def useBitmanip = useZba && useZbb && useZbs
 }
 
 trait HasCoreParameters extends HasTileParameters {

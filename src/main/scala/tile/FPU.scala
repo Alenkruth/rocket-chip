@@ -450,7 +450,7 @@ trait HasFPUParameters {
 
 abstract class FPUModule(implicit val p: Parameters) extends Module with HasCoreParameters with HasFPUParameters
 
-class FPToInt(implicit p: Parameters) extends FPUModule()(p) with ShouldBeRetimed {
+class FPToInt(implicit p: Parameters) extends FPUModule()(p) {
   class Output extends Bundle {
     val in = new FPInput
     val lt = Bool()
@@ -525,7 +525,7 @@ class FPToInt(implicit p: Parameters) extends FPUModule()(p) with ShouldBeRetime
   io.out.bits.in := in
 }
 
-class IntToFP(val latency: Int)(implicit p: Parameters) extends FPUModule()(p) with ShouldBeRetimed {
+class IntToFP(val latency: Int)(implicit p: Parameters) extends FPUModule()(p) {
   val io = IO(new Bundle {
     val in = Flipped(Valid(new IntToFPInput))
     val out = Valid(new FPResult)
@@ -570,7 +570,7 @@ class IntToFP(val latency: Int)(implicit p: Parameters) extends FPUModule()(p) w
   io.out <> Pipe(in.valid, mux, latency-1)
 }
 
-class FPToFP(val latency: Int)(implicit p: Parameters) extends FPUModule()(p) with ShouldBeRetimed {
+class FPToFP(val latency: Int)(implicit p: Parameters) extends FPUModule()(p) {
   val io = IO(new Bundle {
     val in = Flipped(Valid(new FPInput))
     val out = Valid(new FPResult)
@@ -695,7 +695,7 @@ class MulAddRecFNPipe(latency: Int, expWidth: Int, sigWidth: Int) extends Module
 }
 
 class FPUFMAPipe(val latency: Int, val t: FType)
-                (implicit p: Parameters) extends FPUModule()(p) with ShouldBeRetimed {
+                (implicit p: Parameters) extends FPUModule()(p) {
   override def desiredName = s"FPUFMAPipe_l${latency}_f${t.ieeeWidth}"
   require(latency>0)
 
@@ -754,6 +754,7 @@ class FPU(cfg: FPUParams)(implicit p: Parameters) extends FPUModule()(p) {
     val v_decode = v.decoder(p) // Only need to get ren1
     v_decode.io.inst := io.inst
     v_decode.io.vconfig := DontCare // core deals with this
+    v_decode.io.vconfig.vtype.vsew := io.v_sew
     when (v_decode.io.legal && v_decode.io.read_frs1) {
       id_ctrl.ren1 := true.B
       id_ctrl.swap12 := false.B
@@ -988,7 +989,7 @@ class FPU(cfg: FPUParams)(implicit p: Parameters) extends FPUModule()(p) {
     s"FPU only supports coprocessor if FMA pipes have uniform latency ${pipes.map(_.lat)}")
   // Avoid structural hazards and nacking of external requests
   // toint responds in the MEM stage, so an incoming toint can induce a structural hazard against inflight FMAs
-  io.cp_req.ready := !ex_reg_valid && !(cp_ctrl.toint && wen =/= 0.U) && !divSqrt_inFlight
+  io.cp_req.ready := !(cp_ctrl.toint && wen =/= 0.U) && !divSqrt_inFlight
 
   val wb_toint_valid = wb_reg_valid && wb_ctrl.toint
   val wb_toint_exc = RegEnable(fpiu.io.out.bits.exc, mem_ctrl.toint)
@@ -1000,7 +1001,7 @@ class FPU(cfg: FPUParams)(implicit p: Parameters) extends FPUModule()(p) {
 
   val divSqrt_write_port_busy = (mem_ctrl.div || mem_ctrl.sqrt) && wen.orR
   io.fcsr_rdy := !(ex_reg_valid && ex_ctrl.wflags || mem_reg_valid && mem_ctrl.wflags || wb_reg_valid && wb_ctrl.toint || wen.orR || divSqrt_inFlight)
-  io.nack_mem := (write_port_busy || divSqrt_write_port_busy || divSqrt_inFlight) && !mem_cp_valid
+  io.nack_mem := (write_port_busy || divSqrt_write_port_busy || divSqrt_inFlight || mem_cp_valid)
   io.dec <> id_ctrl
   def useScoreboard(f: ((Pipe, Int)) => Bool) = pipes.zipWithIndex.filter(_._1.lat > 3).map(x => f(x)).fold(false.B)(_||_)
   io.sboard_set := wb_reg_valid && !wb_cp_valid && RegNext(useScoreboard(_._1.cond(mem_ctrl)) || mem_ctrl.div || mem_ctrl.sqrt || mem_ctrl.vec)
