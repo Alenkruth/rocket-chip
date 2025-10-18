@@ -88,10 +88,15 @@ class CustomCSRs(implicit p: Parameters) extends CoreBundle {
   protected def ldqStqCSRIdCF = 0x7c4
   protected def ldqStqCSRCF: Option[CustomCSR] = None
 
+  // CSR to quiesce the pipeline to intiate a reconfiguration
+  protected def chillCSRIdCF = 0x7c5
+  protected def chillCSRCF: Option[CustomCSR] = None
+
   // If you override this, you'll want to concatenate super.decls
   def decls: Seq[CustomCSR] = bpmCSR.toSeq ++ chickenCSR ++ bpdCSRCF ++
                               dcacheCSRCF ++ debugCSRCF ++ robSizeCSRCF ++
-                              cacheBlockSizeCSRCF ++ fetchBufferCSRCF ++ ldqStqCSRCF // ++ coreWidthCSR
+                              cacheBlockSizeCSRCF ++ fetchBufferCSRCF ++ ldqStqCSRCF ++
+                              chillCSRCF // ++ coreWidthCSR
 
   // If you override this, you'll want to concatenate super.decls
   //def decls: Seq[CustomCSR] = bpmCSR.toSeq ++ chickenCSR ++ bpdCSRCF ++
