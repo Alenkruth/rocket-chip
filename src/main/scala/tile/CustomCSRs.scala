@@ -92,11 +92,32 @@ class CustomCSRs(implicit p: Parameters) extends CoreBundle {
   protected def chillCSRIdCF = 0x7c5
   protected def chillCSRCF: Option[CustomCSR] = None
 
+  // CSR for attacker address start
+  protected def attackerAddrStartCSRIdCF = 0x7c6
+  protected def attackerAddrStartCSRCF: Option[CustomCSR] = None
+
+  // CSR for attacher address end
+  protected def attackerAddrEndCSRIdCF = 0x7c7
+  protected def attackerAddrEndCSRCF: Option[CustomCSR] = None
+
+  // CSR for secret address start
+  protected def secretAddrStartCSRIdCF = 0x7c8
+  protected def secretAddrStartCSRCF: Option[CustomCSR] = None
+
+  // CSR for secret address end
+  protected def secretAddrEndCSRIdCF = 0x7c9
+  protected def secretAddrEndCSRCF: Option[CustomCSR] = None
+
+  // CSR for passing attack stage to the core
+  protected def attackStageCSRIdCF = 0x7ca
+  protected def attackStageCSRCF: Option[CustomCSR] = None
+
   // If you override this, you'll want to concatenate super.decls
   def decls: Seq[CustomCSR] = bpmCSR.toSeq ++ chickenCSR ++ bpdCSRCF ++
                               dcacheCSRCF ++ debugCSRCF ++ robSizeCSRCF ++
                               cacheBlockSizeCSRCF ++ fetchBufferCSRCF ++ ldqStqCSRCF ++
-                              chillCSRCF // ++ coreWidthCSR
+                              chillCSRCF ++ attackStageCSRCF ++ attackerAddrStartCSRCF ++
+                              attackerAddrEndCSRCF ++ secretAddrStartCSRCF ++ secretAddrEndCSRCF // ++ coreWidthCSR
 
   // If you override this, you'll want to concatenate super.decls
   //def decls: Seq[CustomCSR] = bpmCSR.toSeq ++ chickenCSR ++ bpdCSRCF ++
