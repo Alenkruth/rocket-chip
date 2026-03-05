@@ -74,7 +74,15 @@ trait CoreFuzzingConstants{
     // 16: 200
     // 17: 250
     // 18: 256 
-    def robEntryOptions = Seq(300, 16, 20, 24, 30, 32, 40, 50, 60, 64, 80, 90, 96, 128, 130, 150, 200, 250, 256)
+    def robEntryOptions = Seq(512, 16, 20, 24, 30, 32, 40, 50, 60, 64, 80, 90, 96, 128, 130, 150, 200, 250, 256)
+    // itlb sets is fixed to 1. Not messing with it in fear of timing. defined in rocket>ICache.scala
+    // fixed superpage entries = 4
+    // same with dtlb. Degined in HellaCache.scala
+    def itlbWays = Seq(64, 32, 16, 8, 4, 2, 1)
+    def dtlbWays = Seq(64, 32, 16, 8, 4, 2, 1)
+
+
+
     val setOptions = Seq(128, 32, 64)
     val wayOptions = Seq(16, 1, 2, 4, 8)
     val sizeOptions = Seq(128, 2, 4, 8, 16, 32, 64)
