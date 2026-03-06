@@ -15,7 +15,7 @@ trait CoreFuzzingConstants{
     val uopIDCounterWidthCF = 8
 
     // tags for each module
-    val numModules = 19
+    val numModules = 24
     // tainting info for uops
     val moduleCountCF = log2Ceil(numModules) // we will probably have 16 modules tops
    
@@ -38,6 +38,12 @@ trait CoreFuzzingConstants{
     val stqTagCF = 16
     val dtlbTagCF = 17
     val dcacheTagCF = 18
+    // Functional unit types (added for cf_fu_bitmap tracking)
+    val aluTagCF    = 19
+    val mulTagCF    = 20
+    val divTagCF    = 21
+    val fpuTagCF    = 22
+    val csrTagCF    = 23
 
     val taintTypeCf = 2 // we have 4 types of taints
 
