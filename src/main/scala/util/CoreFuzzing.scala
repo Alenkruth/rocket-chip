@@ -47,6 +47,29 @@ trait CoreFuzzingConstants{
 
     val taintTypeCf = 2 // we have 4 types of taints
 
+    // Number of influencer slots per uop (Phase 2)
+    val numInfluencerSlotsCF = 8
+
+    // Influence type encoding (5-bit; stored in InfluencerEntry.infl_type)
+    val INFL_REG_DATAFLOW     = 0   // victim reads physical reg written by attacker uop
+    val INFL_STL_FORWARD      = 1   // store-to-load forwarding across domains
+    val INFL_ISSUE_CONTENTION = 2   // all issue ports taken by other-domain uops
+    val INFL_MEM_HOL          = 3   // LDQ/STQ commit-head from other domain blocks younger entry
+    val INFL_REG_PRESSURE     = 4   // rename stall: other domain holds free regs
+    val INFL_ROB_FULL         = 5   // ROB full of other-domain entries stalls dispatch
+    val INFL_LDQ_FULL         = 6   // LDQ full stalls dispatch
+    val INFL_STQ_FULL         = 7   // STQ full stalls dispatch
+    val INFL_MEM_ORDER        = 8   // load re-executed due to conflicting store (order_fail)
+    val INFL_BPD_STATE        = 9   // TAGE prediction used row last updated by other domain
+    val INFL_BTB_STATE        = 10  // BTB entry written by other domain
+    val INFL_RAS_STATE        = 11  // RAS entry pushed by other domain
+    val INFL_CACHE_EVICTION   = 12  // dcache line evicted by other-domain miss
+    val INFL_PIPELINE_FLUSH   = 13  // squash/flush caused by other-domain branch/exception
+    val INFL_DTLB_STATE       = 14  // DTLB entry brought in by other-domain miss
+    val INFL_ITLB_STATE       = 15  // ITLB entry brought in by other-domain fetch
+    val INFL_ICACHE_STATE     = 16  // ICache line evicted by other-domain fetch
+    val inflTypeWidthCF       = 5   // bits to hold up to 31 influence types
+
     // Bit widths of reconfiguration control wires
     // we support 4 parameter reconfiguration and each field is 8 bit wide
     val dcacheParamsWidthCF = 8 
@@ -80,7 +103,7 @@ trait CoreFuzzingConstants{
     // 16: 200
     // 17: 250
     // 18: 256 
-    def robEntryOptions = Seq(512, 16, 20, 24, 30, 32, 40, 50, 60, 64, 80, 90, 96, 128, 130, 150, 200, 250, 256)
+    def robEntryOptions = Seq(300, 16, 20, 24, 30, 32, 40, 50, 60, 64, 80, 90, 96, 128, 130, 150, 200, 250, 256)
     // itlb sets is fixed to 1. Not messing with it in fear of timing. defined in rocket>ICache.scala
     // fixed superpage entries = 4
     // same with dtlb. Degined in HellaCache.scala
