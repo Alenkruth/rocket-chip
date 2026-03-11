@@ -12,7 +12,7 @@ trait CoreFuzzingConstants{
     val iftTagWidth = 1
 
     // counter for uops
-    val uopIDCounterWidthCF = 8
+    val uopIDCounterWidthCF = 9
 
     // tags for each module
     val numModules = 24
