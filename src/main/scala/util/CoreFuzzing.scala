@@ -11,8 +11,10 @@ trait CoreFuzzingConstants{
     // Bits used to store the TAG
     val iftTagWidth = 1
 
-    // counter for uops
-    val uopIDCounterWidthCF = 9
+    // counter for uops — 20 bits gives 1 048 576 unique values (~5x the longest
+    // current workload, spectre_v1 at ~203 K instruction events), providing
+    // comfortable headroom against wrapping.  16-bit (65 536) wrapped ~3x in spectre_v1.
+    val uopIDCounterWidthCF = 20
 
     // tags for each module
     val numModules = 24
@@ -47,8 +49,11 @@ trait CoreFuzzingConstants{
 
     val taintTypeCf = 2 // we have 4 types of taints
 
-    // Number of influencer slots per uop (Phase 2)
-    val numInfluencerSlotsCF = 8
+    // Number of influencer slots per uop (Phase 2).
+    // All slots are dynamic (addInfluencer, addInfluencerBatch, wb_resps merge).
+    // Pipeline-flush info is tracked as separate fl/floc fields (like spec_atk/spec_oc),
+    // not as an influencer slot, so no slot is reserved.
+    val numInfluencerSlotsCF = 4
 
     // Influence type encoding (5-bit; stored in InfluencerEntry.infl_type)
     val INFL_REG_DATAFLOW     = 0   // victim reads physical reg written by attacker uop
@@ -68,6 +73,7 @@ trait CoreFuzzingConstants{
     val INFL_DTLB_STATE       = 14  // DTLB entry brought in by other-domain miss
     val INFL_ITLB_STATE       = 15  // ITLB entry brought in by other-domain fetch
     val INFL_ICACHE_STATE     = 16  // ICache line evicted by other-domain fetch
+    val INFL_MEM_DATAFLOW     = 17  // attacker-committed store data read by victim load (cache line ownership)
     val inflTypeWidthCF       = 5   // bits to hold up to 31 influence types
 
     // Bit widths of reconfiguration control wires
@@ -80,43 +86,46 @@ trait CoreFuzzingConstants{
     // val PROTECTED_END   = 0x80002c40L
     // The L here indicates it is LOOOONG!
     
-    // custom ROB entry options
-    // 300 is the default CoreFuzzing ROB size
-    // the rob cofig register at 0xbc2 is by default set to 0 (300 entries)
-    // possible entry configs are
-    // 0 : 300
-    // 1 : 16
-    // 2 : 20
-    // 3 : 24
-    // 4 : 30
-    // 5 : 32
-    // 6 : 40
-    // 7 : 50
-    // 8 : 60
-    // 9 : 64
-    // 10: 80
-    // 11: 90
-    // 12: 96
-    // 13: 128
-    // 14: 130
-    // 15: 150
-    // 16: 200
-    // 17: 250
-    // 18: 256 
-    def robEntryOptions = Seq(300, 16, 20, 24, 30, 32, 40, 50, 60, 64, 80, 90, 96, 128, 130, 150, 200, 250, 256)
+    // custom ROB entry options — index 0 is the largest (hardware-built size).
+    // numRobEntries in WithFuzzingBoom must equal robEntryOptions(0) = 512.
+    // possible entry configs are:
+    // 0 : 512  (default; maximum — hardware is built at this size)
+    // 1 : 256
+    // 2 : 192
+    // 3 : 128
+    // 4 : 96
+    // 5 : 64
+    // 6 : 32
+    def robEntryOptions = Seq(512, 256, 192, 128, 96, 64, 32)
     // itlb sets is fixed to 1. Not messing with it in fear of timing. defined in rocket>ICache.scala
     // fixed superpage entries = 4
     // same with dtlb. Degined in HellaCache.scala
-    def itlbWays = Seq(64, 32, 16, 8, 4, 2, 1)
+    def itlbWayOptions = Seq(64, 32, 16, 8, 4, 2, 1)
     def dtlbWays = Seq(64, 32, 16, 8, 4, 2, 1)
+    def coreWidthOptions = Seq(4, 1, 2, 8) // 4 is default
+    def pregFileSizeOptions = Seq(256, 128, 96, 64, 48) // 256 is default
 
+    // branch predictor options
+    def tagetableCountOptions = Seq(6, 5, 4, 3, 2, 1)
+    def rasEntryCountOptions = Seq(32, 16, 8, 4)
+    def btbSetOptions = Seq(128, 64, 32)
+    def btbWayOptions = Seq(2, 1)
 
-
-    val setOptions = Seq(128, 32, 64)
-    val wayOptions = Seq(16, 1, 2, 4, 8)
-    val sizeOptions = Seq(128, 2, 4, 8, 16, 32, 64)
-    val replOptions = Seq(0, 1) // 0=PseudoLRU, 1=Random
-    val blockSizeOptions = Seq(16, 8) // 16B (default), 8B
+    def fetchBufferEntryOptions = Seq(128, 64, 32, 24, 16, 8)
+    def issueQueueEntryOptions = Seq(64, 32, 16, 8)
+    def ldQueueEntryOptions = Seq(64, 32, 24, 16, 8)
+    def stQueueEntryOptions = Seq(64, 32, 24, 16, 8)
+    def ftQueueEntryOptions = Seq(32, 24, 16, 8)
+    // cache options — index 0 is always the hardware-built (maximum) size.
+    // DCache: nSets=128, nWays=8 in WithFuzzingBoom
+    // ICache: nSets=64,  nWays=8 in WithFuzzingBoom
+    // Block size (cacheBlockBytes) is NOT reconfigurable per user requirement.
+    def dcacheSetOptions = Seq(128, 64, 32, 16)  // index 0 = 128 = nSets for DCache
+    def icacheSetOptions = Seq(64, 32, 16, 8)    // index 0 = 64  = nSets for ICache
+    def cacheWayOptions  = Seq(8, 4, 2, 1)       // shared by both; index 0 = 8 = nWays
+    // Legacy aliases (keep for backward compat with existing code)
+    def setOptions = dcacheSetOptions
+    def wayOptions = cacheWayOptions
 
 }
 
