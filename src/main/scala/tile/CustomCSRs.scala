@@ -112,12 +112,45 @@ class CustomCSRs(implicit p: Parameters) extends CoreBundle {
   protected def attackStageCSRIdCF = 0x7ca
   protected def attackStageCSRCF: Option[CustomCSR] = None
 
+  // CSR for FTQ size reconfiguration (2-bit index into ftQueueEntryOptions)
+  protected def ftqSizeCSRIdCF = 0xbc5
+  protected def ftqSizeCSRCF: Option[CustomCSR] = None
+
+  // CSR for RAS entry count reconfiguration (2-bit index into rasEntryCountOptions)
+  protected def rasCountCSRIdCF = 0xbc6
+  protected def rasCountCSRCF: Option[CustomCSR] = None
+
+  // CSR for physical register file size reconfiguration (3-bit index into pregFileSizeOptions)
+  protected def pregSizeCSRIdCF = 0xbc7
+  protected def pregSizeCSRCF: Option[CustomCSR] = None
+
+  // CSR for issue queue size reconfiguration (2-bit index into issueQueueEntryOptions)
+  protected def issueQueueCSRIdCF = 0xbc8
+  protected def issueQueueCSRCF: Option[CustomCSR] = None
+
+  // CSR for BTB set/way reconfiguration (bits[1:0]=sets index, bit[2]=ways index)
+  protected def btbConfigCSRIdCF = 0xbc9
+  protected def btbConfigCSRCF: Option[CustomCSR] = None
+
+  // CSR for TAGE active table count reconfiguration (3-bit index into tagetableCountOptions)
+  protected def tageCountCSRIdCF = 0xbca
+  protected def tageCountCSRCF: Option[CustomCSR] = None
+
+  // CSR for ICache set/way reconfiguration (bits[1:0]=set index, bits[3:2]=way index)
+  //   bits [1:0]: index into icacheSetOptions = Seq(64, 32, 16, 8)
+  //   bits [3:2]: index into cacheWayOptions  = Seq(8, 4, 2, 1)
+  protected def icacheCSRIdCF = 0xbcb
+  protected def icacheCSRCF: Option[CustomCSR] = None
+
   // If you override this, you'll want to concatenate super.decls
   def decls: Seq[CustomCSR] = bpmCSR.toSeq ++ chickenCSR ++ bpdCSRCF ++
                               dcacheCSRCF ++ debugCSRCF ++ robSizeCSRCF ++
                               cacheBlockSizeCSRCF ++ fetchBufferCSRCF ++ ldqStqCSRCF ++
                               chillCSRCF ++ attackStageCSRCF ++ attackerAddrStartCSRCF ++
-                              attackerAddrEndCSRCF ++ secretAddrStartCSRCF ++ secretAddrEndCSRCF // ++ coreWidthCSR
+                              attackerAddrEndCSRCF ++ secretAddrStartCSRCF ++ secretAddrEndCSRCF ++
+                              ftqSizeCSRCF ++ rasCountCSRCF ++ pregSizeCSRCF ++
+                              issueQueueCSRCF ++ btbConfigCSRCF ++ tageCountCSRCF ++
+                              icacheCSRCF // ++ coreWidthCSR
 
   // If you override this, you'll want to concatenate super.decls
   //def decls: Seq[CustomCSR] = bpmCSR.toSeq ++ chickenCSR ++ bpdCSRCF ++
