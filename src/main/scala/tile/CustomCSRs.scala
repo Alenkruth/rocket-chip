@@ -67,10 +67,6 @@ class CustomCSRs(implicit p: Parameters) extends CoreBundle {
   protected def robSizeCSRIdCF = 0xbc2
   protected def robSizeCSRCF: Option[CustomCSR] = None
 
-  // CSR for cache block size reconfiguration (unsigned integer)
-  protected def cacheBlockSizeCSRIdCF = 0xbc3
-  protected def cacheBlockSizeCSRCF: Option[CustomCSR] = None
-
   // CSR for core width reconfiguration (one-hot encoding)
   // protected def coreWidthCSRId = 0xbc3
   // protected def coreWidthCSR: Option[CustomCSR] = {
@@ -142,20 +138,20 @@ class CustomCSRs(implicit p: Parameters) extends CoreBundle {
   protected def icacheCSRIdCF = 0xbcb
   protected def icacheCSRCF: Option[CustomCSR] = None
 
+  // CSR for runtime core-width reconfiguration (2-bit index into {4, 2, 1} width options)
+  //   index 0 = N=4 (full width, default), index 1 = N=2, index 2 = N=1
+  protected def coreWidthCSRIdCF = 0xbcc
+  protected def coreWidthCSRCF: Option[CustomCSR] = None
+
   // If you override this, you'll want to concatenate super.decls
   def decls: Seq[CustomCSR] = bpmCSR.toSeq ++ chickenCSR ++ bpdCSRCF ++
                               dcacheCSRCF ++ debugCSRCF ++ robSizeCSRCF ++
-                              cacheBlockSizeCSRCF ++ fetchBufferCSRCF ++ ldqStqCSRCF ++
+                              fetchBufferCSRCF ++ ldqStqCSRCF ++
                               chillCSRCF ++ attackStageCSRCF ++ attackerAddrStartCSRCF ++
                               attackerAddrEndCSRCF ++ secretAddrStartCSRCF ++ secretAddrEndCSRCF ++
                               ftqSizeCSRCF ++ rasCountCSRCF ++ pregSizeCSRCF ++
                               issueQueueCSRCF ++ btbConfigCSRCF ++ tageCountCSRCF ++
-                              icacheCSRCF // ++ coreWidthCSR
-
-  // If you override this, you'll want to concatenate super.decls
-  //def decls: Seq[CustomCSR] = bpmCSR.toSeq ++ chickenCSR ++ bpdCSRCF ++
-  //                            dcacheCSRCF ++ debugCSRCF ++ robSizeCSRCF ++
-  //                            cacheBlockSizeCSRCF // ++ coreWidthCSR
+                              icacheCSRCF ++ coreWidthCSRCF
 
   val csrs = Vec(decls.size, new CustomCSRIO)
 
