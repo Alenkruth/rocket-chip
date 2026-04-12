@@ -92,7 +92,12 @@ trait CoreFuzzingConstants{
     def itlbWayOptions = Seq(32, 16, 8, 4, 2, 1)
     def dtlbWays = Seq(32, 16, 8, 4, 2, 1)
     def coreWidthOptions = Seq(4, 2, 1) // index 0=4 (default), 1=2, 2=1; index 3 is reserved
-    def pregFileSizeOptions = Seq(192, 128, 96, 64, 48) // 256 is default
+    def pregFileSizeOptions = Seq(192, 128, 96, 64, 48) // INT hardware max = 192
+    // FP physical register file reconfiguration.  Hardware max for FP is 96
+    // (half of INT) to relieve FpPipeline/fregfile congestion on the FPGA.
+    // Shares the same cf_preg_idx CSR as INT — each index position maps to a
+    // distinct size on the FP side.
+    def fpPregFileSizeOptions = Seq(96, 64, 48, 32, 16)
 
     // branch predictor options
     // Table 3 is reserved as the GShare bank (active only when cf_bpd_tage_to_gshare=1).
