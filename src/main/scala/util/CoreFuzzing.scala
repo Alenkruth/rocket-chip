@@ -97,7 +97,7 @@ trait CoreFuzzingConstants{
     // (half of INT) to relieve FpPipeline/fregfile congestion on the FPGA.
     // Shares the same cf_preg_idx CSR as INT — each index position maps to a
     // distinct size on the FP side.
-    def fpPregFileSizeOptions = Seq(96, 64, 48, 32, 16)
+    def fpPregFileSizeOptions = Seq(96, 64, 48, 32, 32)
 
     // branch predictor options
     // Table 3 is reserved as the GShare bank (active only when cf_bpd_tage_to_gshare=1).
