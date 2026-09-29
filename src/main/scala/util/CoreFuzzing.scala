@@ -49,7 +49,54 @@ trait CoreFuzzingConstants{
     // All slots are dynamic (addInfluencer, addInfluencerBatch, wb_resps merge).
     // Pipeline-flush info is tracked as separate fl/floc fields (like spec_atk/spec_oc),
     // not as an influencer slot, so no slot is reserved.
-    val numInfluencerSlotsCF = 3
+    //
+    // Raised 3 -> 4 alongside the entry narrowing (28b -> 16b, see inflOpCountWidthCF),
+    // so 4 slots now cost less than 3 did.  3 was measurably binding, and the bias it
+    // introduced was not uniform: candidates fill slots SEQUENTIALLY in the order listed
+    // at core.scala's addInfluencerBatch call, where INFL_MEM_HOL is last of seven, and
+    // fetch (BTB/BPD/RAS_STATE) has already consumed slots before dispatch runs.  So the
+    // influence census systematically under-counts whatever is added late in the pipeline.
+    // Measured on run_00016: cf_infl_overflow set on 15.4% of all records and 40.3% of
+    // secret-carrying ones, with MEM_HOL still reaching 323,790 entries -- a floor, not a
+    // measurement, and top_undefended is ranked on those counts.
+    val numInfluencerSlotsCF = 4
+
+    // Width of InfluencerEntry.op_count.  It stores only the LOW bits of the
+    // influencing uop's op_count_id; software reconstructs the full value from the
+    // consuming record's own 16-bit op_count:
+    //     producer = own - ((own - stored) & ((1 << inflOpCountWidthCF) - 1))
+    // Correct whenever the true distance is < 2^inflOpCountWidthCF.  Truncation is free
+    // in hardware -- storing a delta instead would need a subtract, which this avoids.
+    //
+    // WIDTH RATIONALE.  Sized from the TAIL across ten attack workloads, not from one:
+    //
+    //   workload  p99.99  max     longest-edge type
+    //   fr           426  458     INFL_REG_DATAFLOW
+    //   ff           382  433     INFL_REG_DATAFLOW
+    //   pp           382  402     INFL_CACHE_EVICTION
+    //   ridl         420  423     INFL_CACHE_EVICTION
+    //   ssb          444  446     INFL_REG_DATAFLOW
+    //   spectre_v3   462  498     INFL_CACHE_EVICTION
+    //
+    // An earlier revision used 8 bits, sized from spectre_v1 alone (99.58% within 256).
+    // That was a tuning artifact: on flush+reload and meltdown it aliases 4.5% of edges.
+    // 9 bits (512) covers every observed edge but leaves only 2.8% headroom over the
+    // 498 maximum, which is not enough for a fuzzer meant to run on unprofiled programs.
+    //
+    // 10 bits gives ~2x margin.  The binding constraint is INFL_CACHE_EVICTION, which
+    // references whatever instruction filled the evicted line -- unbounded by
+    // construction once a program has a real working set, and already the longest edge
+    // in three of six workloads above.  Aliasing does not drop an edge, it FABRICATES a
+    // link to the wrong producer, so margin is worth more here than area: a false edge
+    // becomes a false novel flow that someone has to chase.
+    val inflOpCountWidthCF = 10
+
+    // Width of cf_spec_branch_op_id, likewise storing only the LOW bits of the
+    // speculating branch's op_count_id.  Bounded by construction -- the distance cannot
+    // exceed the speculation window -- and measured max across five workloads is 76
+    // (fr 65, retbleed 65, ret2spec 76, spectre_v1 54, spectre_v3 13), so 8 bits carries
+    // a 3.4x margin.  Unlike the influencer field there is no unbounded mechanism here.
+    val specBranchOpIdWidthCF = 8
 
     // Influence type encoding (5-bit; stored in InfluencerEntry.infl_type)
     val INFL_REG_DATAFLOW     = 0   // victim reads physical reg written by attacker uop
@@ -70,6 +117,9 @@ trait CoreFuzzingConstants{
     val INFL_ITLB_STATE       = 15  // ITLB entry brought in by other-domain fetch
     val INFL_ICACHE_STATE     = 16  // ICache line evicted by other-domain fetch
     val INFL_MEM_DATAFLOW     = 17  // attacker-committed store data read by victim load (cache line ownership)
+    val INFL_FU_BUSY          = 18  // non-pipelined FU (div/fdivsqrt) occupied by other-domain or secret-dependent op blocks issue
+    val INFL_GHIST_STATE      = 19  // global history register still holds a secret-influenced branch outcome (64-branch window)
+    val INFL_CONTROL_FLOW     = 20  // uop is control-dependent on a secret branch (implicit flow: which path ran, not which bits moved)
     val inflTypeWidthCF       = 5   // bits to hold up to 31 influence types
 
     // Bit widths of reconfiguration control wires
@@ -86,18 +136,47 @@ trait CoreFuzzingConstants{
     // 4 : 64
     // 5 : 32
     def robEntryOptions = Seq(256, 192, 128, 96, 64, 32)
-    // itlb sets is fixed to 1. Not messing with it in fear of timing. defined in rocket>ICache.scala
-    // fixed superpage entries = 4
-    // same with dtlb. Degined in HellaCache.scala
-    def itlbWayOptions = Seq(32, 16, 8, 4, 2, 1)
-    def dtlbWays = Seq(32, 16, 8, 4, 2, 1)
+    // NOTE: the TLBs are NOT runtime-reconfigurable.  itlb sets are fixed at 1 with 4
+    // superpage entries (rocket/ICache.scala), and the dtlb likewise (HellaCache.scala).
+    // Way-count vectors for both used to be declared here, but nothing in the RTL ever
+    // consumed them -- they advertised a reconfiguration dimension that does not exist,
+    // and one of them listed a range the fuzzer's own itlbNWays list disagreed with.
+    // Removed 2026-08-29.  dtlbNWays/itlbNWays remain in csr_map.REBUILD_REQUIRED, which
+    // is the accurate statement: changing them needs a resynthesis, not a CSR write.
     def coreWidthOptions = Seq(4, 2, 1) // index 0=4 (default), 1=2, 2=1; index 3 is reserved
-    def pregFileSizeOptions = Seq(192, 128, 96, 64, 48) // INT hardware max = 192
-    // FP physical register file reconfiguration.  Hardware max for FP is 96
-    // (half of INT) to relieve FpPipeline/fregfile congestion on the FPGA.
-    // Shares the same cf_preg_idx CSR as INT — each index position maps to a
-    // distinct size on the FP side.
-    def fpPregFileSizeOptions = Seq(96, 64, 48, 32, 32)
+    // INT and FP PRF reconfiguration share ONE index (cf_preg_idx, CSR 0xbc7), so
+    // the two lists MUST stay the same length and a rung cannot be removed from one
+    // without removing it from the other.
+    //
+    // The 5th rung keeps its INT size (48) but its FP size is CLAMPED to the floor
+    // (40, same as rung 3) -- 2026-08-28. fp=36 deadlocks the core, and because one
+    // index drives both files, dropping the rung would have cost the int=48 sweep
+    // point for a fault that has nothing to do with the INT file. Clamping keeps
+    // every INT configuration sweepable and makes 40 the lowest FP size reachable.
+    // Measured on an otherwise fully default machine (coreWidth 4, ROB 512):
+    //
+    //     36 FP pregs - 32 architectural (f0..f31 all live)
+    //                 -  4 held in RenameFreeList pre-selection r_sel (plWidth = coreWidth)
+    //                 =  0 available -> the next FP write never renames -> no commits
+    //                    -> core.scala:2083 "Pipeline has hung." after 8192 idle cycles
+    //
+    // Confirmed both directions, one variable, all else default:
+    //     0xbc7=4 (fp 36) -> HANG  (spectre_v1 @1,421,525 cyc; mm.riscv @1,741,815)
+    //     0xbc7=3 (fp 40) -> PASS, tohost=3, full run in 1652 s
+    // Reproducer without attack code: riscv-tests benchmarks/mm.riscv (1214 FP-dest
+    // instrs over 31 distinct FP dest regs). Integer-only benchmarks pass at fp=36,
+    // so the INT half was never the problem -- int=48 only went with it because the
+    // two share an index.
+    //
+    // The floor is numLregs + 2*plWidth = 40 at coreWidth 4, NOT 32 + coreWidth:
+    // `require(numFpPhysRegs >= 32 + coreWidth)` budgets coreWidth spare pregs, but the
+    // freelist pre-selection pipeline permanently holds coreWidth of them. RenameFreeList
+    // now enforces this per-option so the rung cannot come back by accident.
+    def pregFileSizeOptions   = Seq(192, 128, 96, 64, 48) // INT hardware max = 192
+    // NOTE the repeated 40: indices 3 and 4 give the SAME FP size on purpose. 40 is the
+    // floor (32 arch + 2*coreWidth); rung 4 exists to sweep int=48, not to shrink FP
+    // further. Never let any entry fall below 40 -- RenameFreeList requires it.
+    def fpPregFileSizeOptions = Seq( 96,  64, 48, 40, 40) // FP hardware max = 96; floor 40
 
     // branch predictor options
     // Table 3 is reserved as the GShare bank (active only when cf_bpd_tage_to_gshare=1).
@@ -120,8 +199,26 @@ trait CoreFuzzingConstants{
 
     def fetchBufferEntryOptions = Seq(64, 48, 32, 24, 16, 8)
     def issueQueueEntryOptions = Seq(32, 24, 16, 8)
-    def ldQueueEntryOptions = Seq(48, 32, 24, 16, 8)
-    def stQueueEntryOptions = Seq(48, 32, 24, 16, 8)
+    // Top rung 48 -> 40 (2026-08-29).  Hardware is built at each list's MAXIMUM, so the
+    // top rung sets the silicon cost even when a small config is selected.  48 put this
+    // core out of family: MegaBoom (width 4) and GigaBoom (width 5) both use 32, and even
+    // TeraBoom only reaches 64 at width 8 -- while this is a width-4 core.  The LSU is
+    // 213,428 LUTs at a 6.2 LUT:FF ratio, and its age matrices and store-to-load CAM scale
+    // roughly with queue depth SQUARED, so the top rung is disproportionately expensive.
+    //
+    // 40 rather than 32 keeps a distinct top rung above MegaBoom's 32.  Recovers ~30% of
+    // the depth-squared logic instead of ~55%.
+    //
+    // NOTE ON ORDERING -- this list is DESCENDING, but the fuzzer's OPTION_LISTS in
+    // base-attacks/fuzzer/evaluator.py is ASCENDING ([8, 16, 24, 32, 48]).  A config's
+    // stored index therefore refers to the ASCENDING list: index 0 is the SMALLEST size,
+    // not the largest.  Reading a campaign's index vector against this file's ordering
+    // inverts every conclusion -- it briefly produced the claim that the 48 rung was the
+    // most-used and the one where INFL_ROB_FULL dominated, when in fact index 0 = 8
+    // entries and no campaign run ever selected 48.  Cross-check against OPTION_LISTS
+    // before drawing conclusions about which rungs earn their area.
+    def ldQueueEntryOptions = Seq(40, 32, 24, 16, 8)
+    def stQueueEntryOptions = Seq(40, 32, 24, 16, 8)
     def ftQueueEntryOptions = Seq(32, 24, 16, 8)
     // cache options — index 0 is always the hardware-built (maximum) size.
     // DCache: nSets=128, nWays=8 in WithFuzzingBoom
