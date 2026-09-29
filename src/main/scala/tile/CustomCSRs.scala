@@ -108,6 +108,21 @@ class CustomCSRs(implicit p: Parameters) extends CoreBundle {
   protected def attackStageCSRIdCF = 0x7ca
   protected def attackStageCSRCF: Option[CustomCSR] = None
 
+  // CSR for L1 D$ cache control (RESTORE-ONLY: discards dirty data)
+  //   bit 1: invalidate-all walk — drops every L1 D$ line with NO writeback.
+  //   Used only by the checkpoint-restore flow (DTM) and r30; using it during
+  //   normal execution loses committed stores.
+  protected def cachectlCSRIdCF = 0xbc4
+  protected def cachectlCSRCF: Option[CustomCSR] = None
+
+  // Read-only D$ status CSR (hardware-published every cycle; sw writes ignored):
+  //   [10:0] dirty_count (tied 0 until dirty accounting lands)
+  //   [11]   reconf_blocked (tied 0 until guard lands)
+  //   [15:12] applied set/way idx, [16] cfg_pending (tied 0 for now)
+  //   [17]   l1 wipe busy (invalidate walker active)
+  protected def dcacheStatusCSRIdCF = 0xbcd
+  protected def dcacheStatusCSRCF: Option[CustomCSR] = None
+
   // CSR for FTQ size reconfiguration (2-bit index into ftQueueEntryOptions)
   protected def ftqSizeCSRIdCF = 0xbc5
   protected def ftqSizeCSRCF: Option[CustomCSR] = None
@@ -151,7 +166,7 @@ class CustomCSRs(implicit p: Parameters) extends CoreBundle {
                               attackerAddrEndCSRCF ++ secretAddrStartCSRCF ++ secretAddrEndCSRCF ++
                               ftqSizeCSRCF ++ rasCountCSRCF ++ pregSizeCSRCF ++
                               issueQueueCSRCF ++ btbConfigCSRCF ++ tageCountCSRCF ++
-                              icacheCSRCF ++ coreWidthCSRCF
+                              icacheCSRCF ++ coreWidthCSRCF ++ cachectlCSRCF ++ dcacheStatusCSRCF
 
   val csrs = Vec(decls.size, new CustomCSRIO)
 
