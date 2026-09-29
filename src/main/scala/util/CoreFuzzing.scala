@@ -151,6 +151,7 @@ trait CoreFuzzingConstants{
     val INFL_MEM_DATAFLOW_1   = 24  // MEM_DATAFLOW,   PC[13:12] = 1
     val INFL_MEM_DATAFLOW_2   = 25  // MEM_DATAFLOW,   PC[13:12] = 2
     val INFL_MEM_DATAFLOW_3   = 26  // MEM_DATAFLOW,   PC[13:12] = 3
+    val INFL_BTB_TARGET_INJECT = 27 // BTB-predicted JALR target is cross-domain (branch-target-injection, doc 67 Part A)
     // Scala-time helpers so RTL never hand-writes the arithmetic.
     val inflPcTypeCodes: Seq[Int] = Seq(INFL_CACHE_EVICTION, 21, 22, 23, INFL_MEM_DATAFLOW, 24, 25, 26)
     def inflPcCode(base: Int, pcHi: Int): Int = {
