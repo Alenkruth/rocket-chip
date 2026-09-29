@@ -120,6 +120,48 @@ trait CoreFuzzingConstants{
     val INFL_FU_BUSY          = 18  // non-pipelined FU (div/fdivsqrt) occupied by other-domain or secret-dependent op blocks issue
     val INFL_GHIST_STATE      = 19  // global history register still holds a secret-influenced branch outcome (64-branch window)
     val INFL_CONTROL_FLOW     = 20  // uop is control-dependent on a secret branch (implicit flow: which path ran, not which bits moved)
+
+    // [PCPROV 2026-09-15] PC-keyed provenance for the two D$-sourced types.
+    //
+    // A cache line's age is unbounded, so an op_count (16 b in the line metadata, 10 b
+    // in the slot, wrapping every 65,536 uops) is the wrong key for "which instruction
+    // filled / last stored this line": any fill older than 2^inflOpCountWidthCF uops was
+    // being REFUSED as aliased and the link lost.  The producer's PC never goes stale
+    // and maps directly onto the static attack chain.  Attack binaries are <= 13 KB of
+    // 4-byte-aligned code (no RVC), so PC[13:2] identifies every instruction; measured
+    // on spectre_v1: PC[11:2] alone collides for 302 of 1,045 memory-op PCs, PC[13:2]
+    // for none.
+    //
+    // The slot layout is frozen by the 256-bit IFT bridge record (IFTBridgeIO.scala), so
+    // the 12 PC bits are carried WITHOUT widening anything:
+    //     slot.op_count[9:0]  = PC[11:2]
+    //     slot.infl_type      = base code + PC[13:12]       (2 bits ride in the type)
+    // i.e. each D$ type occupies FOUR consecutive codes; the base code (12 / 17) is the
+    // pre-existing value and still means PC[13:12] == 0.  Decoding:
+    //     base(ty)  = 12 if ty in {12,21,22,23};  17 if ty in {17,24,25,26}
+    //     pc[13:2]  = (pcHi(ty) << 10) | slot.op_count,  pcHi = 0 for the base code,
+    //                 1,2,3 for the three continuation codes
+    // No other type is affected; for every other type slot.op_count is still the
+    // producer's low op_count bits and cf_infl_oc_aliased still range-checks it.  The
+    // PC-typed slots are exempt from that range check (util.scala InfluencerCandidate.is_pc).
+    // 5 codes (27..31) remain free.
+    val INFL_CACHE_EVICTION_1 = 21  // CACHE_EVICTION, PC[13:12] = 1
+    val INFL_CACHE_EVICTION_2 = 22  // CACHE_EVICTION, PC[13:12] = 2
+    val INFL_CACHE_EVICTION_3 = 23  // CACHE_EVICTION, PC[13:12] = 3
+    val INFL_MEM_DATAFLOW_1   = 24  // MEM_DATAFLOW,   PC[13:12] = 1
+    val INFL_MEM_DATAFLOW_2   = 25  // MEM_DATAFLOW,   PC[13:12] = 2
+    val INFL_MEM_DATAFLOW_3   = 26  // MEM_DATAFLOW,   PC[13:12] = 3
+    // Scala-time helpers so RTL never hand-writes the arithmetic.
+    val inflPcTypeCodes: Seq[Int] = Seq(INFL_CACHE_EVICTION, 21, 22, 23, INFL_MEM_DATAFLOW, 24, 25, 26)
+    def inflPcCode(base: Int, pcHi: Int): Int = {
+      require(base == INFL_CACHE_EVICTION || base == INFL_MEM_DATAFLOW)
+      require(pcHi >= 0 && pcHi <= 3)
+      if (pcHi == 0) base
+      else if (base == INFL_CACHE_EVICTION) INFL_CACHE_EVICTION_1 + (pcHi - 1)
+      else INFL_MEM_DATAFLOW_1 + (pcHi - 1)
+    }
+    // width of the PC slice a D$ line remembers about its filler / last storer
+    val inflPcBitsCF          = 12  // PC[13:2]
     val inflTypeWidthCF       = 5   // bits to hold up to 31 influence types
 
     // Bit widths of reconfiguration control wires
