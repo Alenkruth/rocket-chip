@@ -123,6 +123,15 @@ class CustomCSRs(implicit p: Parameters) extends CoreBundle {
   protected def dcacheStatusCSRIdCF = 0xbcd
   protected def dcacheStatusCSRCF: Option[CustomCSR] = None
 
+  // Read-only IFT statistics CSR (hardware-published every cycle; sw writes are overwritten
+  // the next cycle).  Saturating 16-bit counters since reset:
+  //   [15:0]  squash records lost (squash FIFO full or ROB row reused before its drain) (D6)
+  //   [31:16] third same-type update drops at the commit/squash readouts (D19)
+  //   [47:32] the row-reuse share of [15:0]
+  //   [48]    ift_squash_ovf: sticky, a squash record has been lost since reset
+  protected def iftStatsCSRIdCF = 0xbce
+  protected def iftStatsCSRCF: Option[CustomCSR] = None
+
   // CSR for FTQ size reconfiguration (2-bit index into ftQueueEntryOptions)
   protected def ftqSizeCSRIdCF = 0xbc5
   protected def ftqSizeCSRCF: Option[CustomCSR] = None
@@ -166,7 +175,8 @@ class CustomCSRs(implicit p: Parameters) extends CoreBundle {
                               attackerAddrEndCSRCF ++ secretAddrStartCSRCF ++ secretAddrEndCSRCF ++
                               ftqSizeCSRCF ++ rasCountCSRCF ++ pregSizeCSRCF ++
                               issueQueueCSRCF ++ btbConfigCSRCF ++ tageCountCSRCF ++
-                              icacheCSRCF ++ coreWidthCSRCF ++ cachectlCSRCF ++ dcacheStatusCSRCF
+                              icacheCSRCF ++ coreWidthCSRCF ++ cachectlCSRCF ++ dcacheStatusCSRCF ++
+                              iftStatsCSRCF
 
   val csrs = Vec(decls.size, new CustomCSRIO)
 

@@ -144,7 +144,16 @@ trait CoreFuzzingConstants{
     // No other type is affected; for every other type slot.op_count is still the
     // producer's low op_count bits and cf_infl_oc_aliased still range-checks it.  The
     // PC-typed slots are exempt from that range check (util.scala InfluencerCandidate.is_pc).
-    // 5 codes (27..31) remain free.
+    // [BTBDISP 2026-10-13, series-r step 16] the SECRET BTB edge (FetchIftInfo bit 7: a hit on
+    // a secret-trained BTB/uBTB entry or a fetch of a tag a secret allocation displaced) is
+    // PC-coded (PC of the secret allocator / trainer) on its OWN four codes, none shared with
+    // an ordinary edge: 31 (PC[13:12]=0, owner ruling 114), 14 (=1), 15 (=2), 13 (=3)
+    // (ruling 113: retired codes; 13 PIPELINE_FLUSH was never emitted as a slot, 14/15
+    // DTLB/ITLB lost their emitters in step 10, ruling 94).  Decoding: ty in {31,14,15,13} ->
+    // BTB secret edge, pcHi = {31:0, 14:1, 15:2, 13:3}, PC[13:2] = (pcHi << 10) | op_count.
+    // Code 10 (BTB_STATE) is left to the domain-mismatch edge {is_secret=0, op_count 0}.
+    // The INFL_PIPELINE_FLUSH / INFL_DTLB_STATE / INFL_ITLB_STATE names stay for old logs only.
+    // Code map after step 16: 28 IQ_FULL; 29, 30 free; 19 retired.
     val INFL_CACHE_EVICTION_1 = 21  // CACHE_EVICTION, PC[13:12] = 1
     val INFL_CACHE_EVICTION_2 = 22  // CACHE_EVICTION, PC[13:12] = 2
     val INFL_CACHE_EVICTION_3 = 23  // CACHE_EVICTION, PC[13:12] = 3
@@ -152,12 +161,23 @@ trait CoreFuzzingConstants{
     val INFL_MEM_DATAFLOW_2   = 25  // MEM_DATAFLOW,   PC[13:12] = 2
     val INFL_MEM_DATAFLOW_3   = 26  // MEM_DATAFLOW,   PC[13:12] = 3
     val INFL_BTB_TARGET_INJECT = 27 // BTB-predicted JALR target is cross-domain (branch-target-injection, doc 67 Part A)
+    // [IQFULL 2026-10-13, series-r step 16, owner ruling 110] dispatch stalled because an issue
+    // queue had no room while it held a secret-tagged (s_acc||s_prop) or, for a victim uop,
+    // attacker-domain entry.  op_count = 0 (no single culprit).  The ruling named code 18,
+    // but 18 is INFL_FU_BUSY (live: issue-unit-age-ordered.scala); 28 is the first free code.
+    val INFL_IQ_FULL          = 28
+    val INFL_BTB_STATE_0      = 31  // BTB secret edge, PC[13:12] = 0  (ruling 114: not 10, which ordinary edges use)
+    val INFL_BTB_STATE_1      = 14  // BTB_STATE (is_secret=1), PC[13:12] = 1  (retired DTLB_STATE code, ruling 113)
+    val INFL_BTB_STATE_2      = 15  // BTB_STATE (is_secret=1), PC[13:12] = 2  (retired ITLB_STATE code)
+    val INFL_BTB_STATE_3      = 13  // BTB_STATE (is_secret=1), PC[13:12] = 3  (PIPELINE_FLUSH, never a slot)
     // Scala-time helpers so RTL never hand-writes the arithmetic.
-    val inflPcTypeCodes: Seq[Int] = Seq(INFL_CACHE_EVICTION, 21, 22, 23, INFL_MEM_DATAFLOW, 24, 25, 26)
+    val inflPcTypeCodes: Seq[Int] = Seq(INFL_CACHE_EVICTION, 21, 22, 23, INFL_MEM_DATAFLOW, 24, 25, 26,
+                                        INFL_BTB_STATE_0, INFL_BTB_STATE_1, INFL_BTB_STATE_2, INFL_BTB_STATE_3)
     def inflPcCode(base: Int, pcHi: Int): Int = {
-      require(base == INFL_CACHE_EVICTION || base == INFL_MEM_DATAFLOW)
+      require(base == INFL_CACHE_EVICTION || base == INFL_MEM_DATAFLOW || base == INFL_BTB_STATE)
       require(pcHi >= 0 && pcHi <= 3)
-      if (pcHi == 0) base
+      if (base == INFL_BTB_STATE) Seq(INFL_BTB_STATE_0, INFL_BTB_STATE_1, INFL_BTB_STATE_2, INFL_BTB_STATE_3)(pcHi)
+      else if (pcHi == 0) base
       else if (base == INFL_CACHE_EVICTION) INFL_CACHE_EVICTION_1 + (pcHi - 1)
       else INFL_MEM_DATAFLOW_1 + (pcHi - 1)
     }
