@@ -118,7 +118,12 @@ trait CoreFuzzingConstants{
     val INFL_ICACHE_STATE     = 16  // ICache line evicted by other-domain fetch
     val INFL_MEM_DATAFLOW     = 17  // attacker-committed store data read by victim load (cache line ownership)
     val INFL_FU_BUSY          = 18  // non-pipelined FU (div/fdivsqrt) occupied by other-domain or secret-dependent op blocks issue
-    val INFL_GHIST_STATE      = 19  // global history register still holds a secret-influenced branch outcome (64-branch window)
+    // [RDEDGE] patch 80: code 19 (INFL_GHIST_STATE, "global history register still holds a secret-influenced branch
+    // outcome") has had no emitter since the GHR window moved to the cf_*_branch_ctr counters (53-open-gaps.md: 0 in
+    // every log) and is REUSED for INFL_LRSC below (the last free v1 code after 29/30).  Logs from before patch 80
+    // that carry ty=19 (none known) decode as GHIST_STATE; the legacy name is kept in this comment only, because the
+    // parser refuses a code defined twice (ift_semantics.check).
+    val INFL_LRSC             = 19  // an SC used an LR/SC reservation set by an LR whose address is secret-derived or attacker-tainted (key = the LR's op_count)
     val INFL_CONTROL_FLOW     = 20  // uop is control-dependent on a secret branch (implicit flow: which path ran, not which bits moved)
 
     // [PCPROV 2026-09-15] PC-keyed provenance for the two D$-sourced types.
@@ -153,19 +158,28 @@ trait CoreFuzzingConstants{
     // BTB secret edge, pcHi = {31:0, 14:1, 15:2, 13:3}, PC[13:2] = (pcHi << 10) | op_count.
     // Code 10 (BTB_STATE) is left to the domain-mismatch edge {is_secret=0, op_count 0}.
     // The INFL_PIPELINE_FLUSH / INFL_DTLB_STATE / INFL_ITLB_STATE names stay for old logs only.
-    // Code map after step 16: 28 IQ_FULL; 29, 30 free; 19 retired.
+    // Code map after step 16: 28 IQ_FULL; 29, 30 free; 19 retired.  [TY27RM] 27 retired (no emitter).
     val INFL_CACHE_EVICTION_1 = 21  // CACHE_EVICTION, PC[13:12] = 1
     val INFL_CACHE_EVICTION_2 = 22  // CACHE_EVICTION, PC[13:12] = 2
     val INFL_CACHE_EVICTION_3 = 23  // CACHE_EVICTION, PC[13:12] = 3
     val INFL_MEM_DATAFLOW_1   = 24  // MEM_DATAFLOW,   PC[13:12] = 1
     val INFL_MEM_DATAFLOW_2   = 25  // MEM_DATAFLOW,   PC[13:12] = 2
     val INFL_MEM_DATAFLOW_3   = 26  // MEM_DATAFLOW,   PC[13:12] = 3
-    val INFL_BTB_TARGET_INJECT = 27 // BTB-predicted JALR target is cross-domain (branch-target-injection, doc 67 Part A)
+    // [TY27RM 2026-10-22, owner order] RETIRED: no emitter.  Was "BTB-predicted JALR target is
+    // cross-domain" (doc 67 Part A).  The BTB edge is INFL_BTB_STATE (10) and its secret codes
+    // 31/14/15/13.  The name is kept so old logs/bins still decode; code 27 is free for reuse
+    // only with a version gate (like 13/14/15).
+    val INFL_BTB_TARGET_INJECT = 27 // retired (old logs only)
     // [IQFULL 2026-10-13, series-r step 16, owner ruling 110] dispatch stalled because an issue
     // queue had no room while it held a secret-tagged (s_acc||s_prop) or, for a victim uop,
     // attacker-domain entry.  op_count = 0 (no single culprit).  The ruling named code 18,
     // but 18 is INFL_FU_BUSY (live: issue-unit-age-ordered.scala); 28 is the first free code.
     val INFL_IQ_FULL          = 28
+    // [RDEDGE] patch 80 (owner approval 2026-10-19; record v2 classes 20 STL_PARTIAL / 21 DC_BANKCONF / 22 LRSC,
+    // SPEC-P1.md section 2): reader-side edges, oc-keyed, emitted only when the producer is tagged.  v1 -> v2 map
+    // for the decoder: 29 -> class 20, 30 -> class 21, 19 -> class 22 (logs from patch 80 on).
+    val INFL_STL_PARTIAL      = 29  // load replayed behind a partially overlapping older store whose address is secret-derived or attacker-tainted (key = the store's op_count)
+    val INFL_DC_BANKCONF      = 30  // load nacked by a D$ data-array bank conflict with an older lane's access whose address is secret-derived or attacker-tainted (key = that access's op_count)
     val INFL_BTB_STATE_0      = 31  // BTB secret edge, PC[13:12] = 0  (ruling 114: not 10, which ordinary edges use)
     val INFL_BTB_STATE_1      = 14  // BTB_STATE (is_secret=1), PC[13:12] = 1  (retired DTLB_STATE code, ruling 113)
     val INFL_BTB_STATE_2      = 15  // BTB_STATE (is_secret=1), PC[13:12] = 2  (retired ITLB_STATE code)
