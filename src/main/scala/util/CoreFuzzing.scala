@@ -16,34 +16,22 @@ trait CoreFuzzingConstants{
     // comfortable headroom against wrapping.  16-bit (65 536) wrapped ~3x in spectre_v1.
     val uopIDCounterWidthCF = 16
 
-    // tags for each module
-    val numModules = 24
-    // tainting info for uops
-    val icacheTagCF = 0
-    val itlbTagCF = 1
-    val l0BTBTagCF = 2
-    val l1BTBTagCF = 3
-    val btbTagCF = 4
-    val bpdTagCF = 5
-    val rasTagCF = 6
-    val ftqTagCF = 7
-    val fbTagCF = 8
-    val irfTagCF = 9
-    val frfTagCF = 10
-    val intissqTagCF = 11
-    val fpissqTagCF = 12
-    val memissqTagCF = 13
-    val robTagCF = 14
-    val ldqTagCF = 15
-    val stqTagCF = 16
-    val dtlbTagCF = 17
-    val dcacheTagCF = 18
-    // Functional unit types (added for cf_fu_bitmap tracking)
-    val aluTagCF    = 19
-    val mulTagCF    = 20
-    val divTagCF    = 21
-    val fpuTagCF    = 22
-    val csrTagCF    = 23
+    // [RECV3] record v3 unit bitmap (design record-v3-sink-design-20261025.md section 3.2): one bit per real unit the
+    // instruction visited, each with a firing writer; no fetch-side constants and no repurposed bits (sftq is its own
+    // record field).  Bits 10-14 are reserved 0 (owner N-D1 a).  The v1 names (numModules = 24, icacheTagCF ..
+    // csrTagCF) are deleted; every writer is renamed by spec SP-09 (compile-driven).
+    val numModules   = 15
+    val UNIT_INT_IQ  = 0   // dispatched to the integer issue queue (iq_type bit 0); stamped on the ROB enqueue copy
+    val UNIT_MEM_IQ  = 1   // dispatched to the memory issue queue (iq_type bit 1; IQT_MFP included)
+    val UNIT_LDQ     = 2   // occupied an LDQ entry (LDQ enqueue)
+    val UNIT_STQ     = 3   // occupied an STQ entry (STQ enqueue)
+    val UNIT_STQ_FWD = 4   // load whose data came from the store-to-load forwarding path
+    val UNIT_DC      = 5   // load answered by the D$ (any path); store: its STQ-commit access reaches the D$ (pre-mark)
+    val UNIT_MSHR    = 6   // load answered through the MSHR file or an IOMSHR (record dc_kind 2 or 3)
+    val UNIT_ALU     = 7   // executed in the ALU / pipelined multiplier (FU_ALU or FU_MUL; conditional branches are FU_ALU)
+    val UNIT_DIV     = 8   // executed in the iterative divider (FU_DIV)
+    val UNIT_JMP     = 9   // executed in the jump unit (FU_JMP: jal, jalr)
+    require(UNIT_JMP < numModules, "[RECV3] unit bit outside the 15-bit unit field")
 
     // Number of influencer slots per uop (Phase 2).
     // All slots are dynamic (addInfluencer, addInfluencerBatch, wb_resps merge).
@@ -61,35 +49,11 @@ trait CoreFuzzingConstants{
     // measurement, and top_undefended is ranked on those counts.
     val numInfluencerSlotsCF = 4
 
-    // Width of InfluencerEntry.op_count.  It stores only the LOW bits of the
-    // influencing uop's op_count_id; software reconstructs the full value from the
-    // consuming record's own 16-bit op_count:
-    //     producer = own - ((own - stored) & ((1 << inflOpCountWidthCF) - 1))
-    // Correct whenever the true distance is < 2^inflOpCountWidthCF.  Truncation is free
-    // in hardware -- storing a delta instead would need a subtract, which this avoids.
-    //
-    // WIDTH RATIONALE.  Sized from the TAIL across ten attack workloads, not from one:
-    //
-    //   workload  p99.99  max     longest-edge type
-    //   fr           426  458     INFL_REG_DATAFLOW
-    //   ff           382  433     INFL_REG_DATAFLOW
-    //   pp           382  402     INFL_CACHE_EVICTION
-    //   ridl         420  423     INFL_CACHE_EVICTION
-    //   ssb          444  446     INFL_REG_DATAFLOW
-    //   spectre_v3   462  498     INFL_CACHE_EVICTION
-    //
-    // An earlier revision used 8 bits, sized from spectre_v1 alone (99.58% within 256).
-    // That was a tuning artifact: on flush+reload and meltdown it aliases 4.5% of edges.
-    // 9 bits (512) covers every observed edge but leaves only 2.8% headroom over the
-    // 498 maximum, which is not enough for a fuzzer meant to run on unprofiled programs.
-    //
-    // 10 bits gives ~2x margin.  The binding constraint is INFL_CACHE_EVICTION, which
-    // references whatever instruction filled the evicted line -- unbounded by
-    // construction once a program has a real working set, and already the longest edge
-    // in three of six workloads above.  Aliasing does not drop an edge, it FABRICATES a
-    // link to the wrong producer, so margin is worth more here than area: a false edge
-    // becomes a false novel flow that someone has to chase.
-    val inflOpCountWidthCF = 10
+    // [RECV3] influencer slot key width (design 2.4, owner D12 "agreed"): 12 bits.  OC-keyed codes store the producer's
+    // op_count[11:0] (host: producer = own - ((own - key) & 0xFFF), exact while the distance < 4,096); PC-keyed codes
+    // store PC[13:2] whole (one code per type, nothing folded into the type code); NONE-keyed codes store 0.
+    // Replaces inflOpCountWidthCF (10, deleted: every user is renamed by spec SP-06).
+    val inflKeyWidthCF = 12
 
     // Width of cf_spec_branch_op_id, likewise storing only the LOW bits of the
     // speculating branch's op_count_id.  Bounded by construction -- the distance cannot
@@ -98,106 +62,91 @@ trait CoreFuzzingConstants{
     // a 3.4x margin.  Unlike the influencer field there is no unbounded mechanism here.
     val specBranchOpIdWidthCF = 8
 
-    // Influence type encoding (5-bit; stored in InfluencerEntry.infl_type)
-    val INFL_REG_DATAFLOW     = 0   // victim reads physical reg written by attacker uop
-    val INFL_STL_FORWARD      = 1   // store-to-load forwarding across domains
-    val INFL_ISSUE_CONTENTION = 2   // all issue ports taken by other-domain uops
-    val INFL_MEM_HOL          = 3   // LDQ/STQ commit-head from other domain blocks younger entry
-    val INFL_REG_PRESSURE     = 4   // rename stall: other domain holds free regs
-    val INFL_ROB_FULL         = 5   // ROB full of other-domain entries stalls dispatch
-    val INFL_LDQ_FULL         = 6   // LDQ full stalls dispatch
-    val INFL_STQ_FULL         = 7   // STQ full stalls dispatch
-    val INFL_MEM_ORDER        = 8   // load re-executed due to conflicting store (order_fail)
-    val INFL_BPD_STATE        = 9   // TAGE prediction used row last updated by other domain
-    val INFL_BTB_STATE        = 10  // BTB entry written by other domain
-    val INFL_RAS_STATE        = 11  // RAS entry pushed by other domain
-    val INFL_CACHE_EVICTION   = 12  // dcache line evicted by other-domain miss
-    val INFL_PIPELINE_FLUSH   = 13  // squash/flush caused by other-domain branch/exception
-    val INFL_DTLB_STATE       = 14  // DTLB entry brought in by other-domain miss
-    val INFL_ITLB_STATE       = 15  // ITLB entry brought in by other-domain fetch
-    val INFL_ICACHE_STATE     = 16  // ICache line evicted by other-domain fetch
-    val INFL_MEM_DATAFLOW     = 17  // attacker-committed store data read by victim load (cache line ownership)
-    val INFL_FU_BUSY          = 18  // non-pipelined FU (div/fdivsqrt) occupied by other-domain or secret-dependent op blocks issue
-    // [RDEDGE] patch 80: code 19 (INFL_GHIST_STATE, "global history register still holds a secret-influenced branch
-    // outcome") has had no emitter since the GHR window moved to the cf_*_branch_ctr counters (53-open-gaps.md: 0 in
-    // every log) and is REUSED for INFL_LRSC below (the last free v1 code after 29/30).  Logs from before patch 80
-    // that carry ty=19 (none known) decode as GHIST_STATE; the legacy name is kept in this comment only, because the
-    // parser refuses a code defined twice (ift_semantics.check).
-    val INFL_LRSC             = 19  // an SC used an LR/SC reservation set by an LR whose address is secret-derived or attacker-tainted (key = the LR's op_count)
-    val INFL_CONTROL_FLOW     = 20  // uop is control-dependent on a secret branch (implicit flow: which path ran, not which bits moved)
-
-    // [PCPROV 2026-09-15] PC-keyed provenance for the two D$-sourced types.
-    //
-    // A cache line's age is unbounded, so an op_count (16 b in the line metadata, 10 b
-    // in the slot, wrapping every 65,536 uops) is the wrong key for "which instruction
-    // filled / last stored this line": any fill older than 2^inflOpCountWidthCF uops was
-    // being REFUSED as aliased and the link lost.  The producer's PC never goes stale
-    // and maps directly onto the static attack chain.  Attack binaries are <= 13 KB of
-    // 4-byte-aligned code (no RVC), so PC[13:2] identifies every instruction; measured
-    // on spectre_v1: PC[11:2] alone collides for 302 of 1,045 memory-op PCs, PC[13:2]
-    // for none.
-    //
-    // The slot layout is frozen by the 256-bit IFT bridge record (IFTBridgeIO.scala), so
-    // the 12 PC bits are carried WITHOUT widening anything:
-    //     slot.op_count[9:0]  = PC[11:2]
-    //     slot.infl_type      = base code + PC[13:12]       (2 bits ride in the type)
-    // i.e. each D$ type occupies FOUR consecutive codes; the base code (12 / 17) is the
-    // pre-existing value and still means PC[13:12] == 0.  Decoding:
-    //     base(ty)  = 12 if ty in {12,21,22,23};  17 if ty in {17,24,25,26}
-    //     pc[13:2]  = (pcHi(ty) << 10) | slot.op_count,  pcHi = 0 for the base code,
-    //                 1,2,3 for the three continuation codes
-    // No other type is affected; for every other type slot.op_count is still the
-    // producer's low op_count bits and cf_infl_oc_aliased still range-checks it.  The
-    // PC-typed slots are exempt from that range check (util.scala InfluencerCandidate.is_pc).
-    // [BTBDISP 2026-10-13, series-r step 16] the SECRET BTB edge (FetchIftInfo bit 7: a hit on
-    // a secret-trained BTB/uBTB entry or a fetch of a tag a secret allocation displaced) is
-    // PC-coded (PC of the secret allocator / trainer) on its OWN four codes, none shared with
-    // an ordinary edge: 31 (PC[13:12]=0, owner ruling 114), 14 (=1), 15 (=2), 13 (=3)
-    // (ruling 113: retired codes; 13 PIPELINE_FLUSH was never emitted as a slot, 14/15
-    // DTLB/ITLB lost their emitters in step 10, ruling 94).  Decoding: ty in {31,14,15,13} ->
-    // BTB secret edge, pcHi = {31:0, 14:1, 15:2, 13:3}, PC[13:2] = (pcHi << 10) | op_count.
-    // Code 10 (BTB_STATE) is left to the domain-mismatch edge {is_secret=0, op_count 0}.
-    // The INFL_PIPELINE_FLUSH / INFL_DTLB_STATE / INFL_ITLB_STATE names stay for old logs only.
-    // Code map after step 16: 28 IQ_FULL; 29, 30 free; 19 retired.  [TY27RM] 27 retired (no emitter).
-    val INFL_CACHE_EVICTION_1 = 21  // CACHE_EVICTION, PC[13:12] = 1
-    val INFL_CACHE_EVICTION_2 = 22  // CACHE_EVICTION, PC[13:12] = 2
-    val INFL_CACHE_EVICTION_3 = 23  // CACHE_EVICTION, PC[13:12] = 3
-    val INFL_MEM_DATAFLOW_1   = 24  // MEM_DATAFLOW,   PC[13:12] = 1
-    val INFL_MEM_DATAFLOW_2   = 25  // MEM_DATAFLOW,   PC[13:12] = 2
-    val INFL_MEM_DATAFLOW_3   = 26  // MEM_DATAFLOW,   PC[13:12] = 3
-    // [TY27RM 2026-10-22, owner order] RETIRED: no emitter.  Was "BTB-predicted JALR target is
-    // cross-domain" (doc 67 Part A).  The BTB edge is INFL_BTB_STATE (10) and its secret codes
-    // 31/14/15/13.  The name is kept so old logs/bins still decode; code 27 is free for reuse
-    // only with a version gate (like 13/14/15).
-    val INFL_BTB_TARGET_INJECT = 27 // retired (old logs only)
-    // [IQFULL 2026-10-13, series-r step 16, owner ruling 110] dispatch stalled because an issue
-    // queue had no room while it held a secret-tagged (s_acc||s_prop) or, for a victim uop,
-    // attacker-domain entry.  op_count = 0 (no single culprit).  The ruling named code 18,
-    // but 18 is INFL_FU_BUSY (live: issue-unit-age-ordered.scala); 28 is the first free code.
-    val INFL_IQ_FULL          = 28
-    // [RDEDGE] patch 80 (owner approval 2026-10-19; record v2 classes 20 STL_PARTIAL / 21 DC_BANKCONF / 22 LRSC,
-    // SPEC-P1.md section 2): reader-side edges, oc-keyed, emitted only when the producer is tagged.  v1 -> v2 map
-    // for the decoder: 29 -> class 20, 30 -> class 21, 19 -> class 22 (logs from patch 80 on).
-    val INFL_STL_PARTIAL      = 29  // load replayed behind a partially overlapping older store whose address is secret-derived or attacker-tainted (key = the store's op_count)
-    val INFL_DC_BANKCONF      = 30  // load nacked by a D$ data-array bank conflict with an older lane's access whose address is secret-derived or attacker-tainted (key = that access's op_count)
-    val INFL_BTB_STATE_0      = 31  // BTB secret edge, PC[13:12] = 0  (ruling 114: not 10, which ordinary edges use)
-    val INFL_BTB_STATE_1      = 14  // BTB_STATE (is_secret=1), PC[13:12] = 1  (retired DTLB_STATE code, ruling 113)
-    val INFL_BTB_STATE_2      = 15  // BTB_STATE (is_secret=1), PC[13:12] = 2  (retired ITLB_STATE code)
-    val INFL_BTB_STATE_3      = 13  // BTB_STATE (is_secret=1), PC[13:12] = 3  (PIPELINE_FLUSH, never a slot)
-    // Scala-time helpers so RTL never hand-writes the arithmetic.
-    val inflPcTypeCodes: Seq[Int] = Seq(INFL_CACHE_EVICTION, 21, 22, 23, INFL_MEM_DATAFLOW, 24, 25, 26,
-                                        INFL_BTB_STATE_0, INFL_BTB_STATE_1, INFL_BTB_STATE_2, INFL_BTB_STATE_3)
-    def inflPcCode(base: Int, pcHi: Int): Int = {
-      require(base == INFL_CACHE_EVICTION || base == INFL_MEM_DATAFLOW || base == INFL_BTB_STATE)
-      require(pcHi >= 0 && pcHi <= 3)
-      if (base == INFL_BTB_STATE) Seq(INFL_BTB_STATE_0, INFL_BTB_STATE_1, INFL_BTB_STATE_2, INFL_BTB_STATE_3)(pcHi)
-      else if (pcHi == 0) base
-      else if (base == INFL_CACHE_EVICTION) INFL_CACHE_EVICTION_1 + (pcHi - 1)
-      else INFL_MEM_DATAFLOW_1 + (pcHi - 1)
+    // [RECV3] record v3 influence-type code map (design 2.5, owner D13 "yes"): 6 bits, 0 = EMPTY, no code reuse.
+    // Families by the high bits: 0x0x dataflow, 0x1x queue/structural stalls, 0x2x port/arbiter contention,
+    // 0x3x predictor and cache state.  Every v1 numeric value is replaced.  The v1-only names (INFL_PIPELINE_FLUSH,
+    // INFL_DTLB_STATE, INFL_ITLB_STATE, INFL_BTB_TARGET_INJECT, INFL_CACHE_EVICTION_1..3, INFL_MEM_DATAFLOW_1..3,
+    // INFL_BTB_STATE_0..3, inflPcTypeCodes, inflPcCode) are deleted: the 12-bit key carries PC[13:2] whole, so a
+    // PC-keyed type has ONE code.  0x26 (DC_WRPORT in design revision 3) is retired and never reused.
+    // Key kinds (comment column): OC = producer op_count[11:0], PC = PC[13:2], NONE = 0.
+    val inflTypeWidthCF        = 6
+    val INFL_EMPTY             = 0x00  // -     empty slot (the v3 record has no slot valid bit)
+    val INFL_REG_DATAFLOW      = 0x01  // OC    value dataflow through a register (the sprob / store-operand marks carry key 0)
+    val INFL_STL_FORWARD       = 0x02  // OC    store-to-load forwarding (key = the store)
+    val INFL_STL_PARTIAL       = 0x03  // OC    load replayed behind a partially overlapping tagged store / older load
+    val INFL_MEM_DATAFLOW      = 0x04  // PC    load read a doubleword last stored by a tagged store (key = the storer's PC)
+    val INFL_MEM_ORDER         = 0x05  // OC    load squashed by a memory-ordering failure (key = the store / load)
+    val INFL_LRSC              = 0x06  // OC    SC used a reservation set by a tagged LR (key = the LR)
+    val INFL_CONTROL_FLOW      = 0x07  // NONE  implicit flow under the secret window (key 0; the parser names the arming branch)
+    val INFL_ROB_FULL          = 0x10  // OC    dispatch stalled by a full ROB (key = the ROB head)
+    val INFL_LDQ_FULL          = 0x11  // OC    dispatch stalled by a full LDQ (key = the LDQ head)
+    val INFL_STQ_FULL          = 0x12  // OC    dispatch stalled by a full STQ (key = the STQ head)
+    val INFL_IQ_FULL           = 0x13  // OC    dispatch stalled by a full issue queue (key = its stalling occupant)
+    val INFL_FTQ_FULL          = 0x14  // OC    fetch starved by a full FTQ (the patch-59 edge, own code; key = the captured blocker)
+    val INFL_REG_PRESSURE      = 0x15  // OC    rename stalled on free registers (key = the stuck head)
+    val INFL_MEM_HOL           = 0x16  // OC    LDQ/STQ head-of-line blocking (key = the head)
+    val INFL_ISSUE_CONTENTION  = 0x20  // OC    issue port denied to a ready uop (key = the winner)
+    val INFL_FU_BUSY           = 0x21  // OC    non-pipelined unit busy (key = the occupant)
+    val INFL_DC_BANKCONF       = 0x22  // OC    D$ data-bank conflict nack (key = the older lane's access)
+    val INFL_DC_NACK           = 0x23  // PC    D$ nack while a tagged MSHR/WB access was in flight (key = that access's PC)
+    val INFL_LSU_LANE          = 0x24  // OC    LSU lane lost to a higher-priority candidate (key = the winner; spec SP-20)
+    val INFL_DC_PORT_BLOCK     = 0x25  // OC    D$ request port refused (key = the winning MSHR's primary op_count, or 0: prober / writeback / hold-off; spec SP-20)
+    //                           0x26     retired (design revision 4, audit G6): never reuse
+    val INFL_LOAD_PAUSE        = 0x27  // NONE  mem issue paused by LDQ saturation (key 0; spec SP-20)
+    val INFL_BPD_STATE         = 0x30  // OC    prediction from a TAGE/BIM row trained by the other domain / by a secret
+    val INFL_BTB_STATE         = 0x31  // NONE  BTB/uBTB entry trained by the other domain (fetch flag 5, domain mismatch; key 0)
+    val INFL_RAS_STATE         = 0x32  // OC    RAS entry pushed by the other domain, or a stale pop
+    val INFL_ICACHE_STATE      = 0x33  // OC    I$ line brought in by the other domain / a secret fetch
+    val INFL_CACHE_EVICTION    = 0x34  // PC    D$ eviction / residency (key = the filler / marker PC)
+    val INFL_REPL_STATE        = 0x35  // PC    D$ eviction attributed through the set's replacement state (key = the advancer PC); replaces v1 record bit [254]
+    val INFL_BTB_DISPLACE      = 0x36  // PC    hit on a secret-trained BTB/uBTB entry, or fetch of a tag a secret / attacker allocation
+                                       //       displaced (fetch flags 7 / 8; sec = flag 7, atk = flag 8; key = the allocator / trainer PC)
+                                       //       [controller decision 2026-10-25, stream B gap B-2 option (a): own code, was BTB_STATE sec=1]
+    // Key kind per code (design 2.5 column "key").  Hardware use: only OC-keyed candidates take part in the
+    // oc_aliased range check (util.scala, spec SP-06).  Host use: the decoder's key printing (spec SP-11).
+    val KEY_OC       = 0
+    val KEY_PC       = 1
+    val KEY_NONE     = 2
+    val inflKeyKindMap: Map[Int, Int] = Map(
+      INFL_EMPTY -> KEY_NONE,
+      INFL_REG_DATAFLOW -> KEY_OC, INFL_STL_FORWARD -> KEY_OC, INFL_STL_PARTIAL -> KEY_OC, INFL_MEM_DATAFLOW -> KEY_PC,
+      INFL_MEM_ORDER -> KEY_OC, INFL_LRSC -> KEY_OC, INFL_CONTROL_FLOW -> KEY_NONE,
+      INFL_ROB_FULL -> KEY_OC, INFL_LDQ_FULL -> KEY_OC, INFL_STQ_FULL -> KEY_OC, INFL_IQ_FULL -> KEY_OC,
+      INFL_FTQ_FULL -> KEY_OC, INFL_REG_PRESSURE -> KEY_OC, INFL_MEM_HOL -> KEY_OC,
+      INFL_ISSUE_CONTENTION -> KEY_OC, INFL_FU_BUSY -> KEY_OC, INFL_DC_BANKCONF -> KEY_OC, INFL_DC_NACK -> KEY_PC,
+      INFL_LSU_LANE -> KEY_OC, INFL_DC_PORT_BLOCK -> KEY_OC, INFL_LOAD_PAUSE -> KEY_NONE,
+      INFL_BPD_STATE -> KEY_OC, INFL_BTB_STATE -> KEY_NONE, INFL_RAS_STATE -> KEY_OC, INFL_ICACHE_STATE -> KEY_OC,
+      INFL_CACHE_EVICTION -> KEY_PC, INFL_REPL_STATE -> KEY_PC, INFL_BTB_DISPLACE -> KEY_PC)
+    def inflKeyKind(code: Int): Int = {
+      require(inflKeyKindMap.contains(code), s"[RECV3] influence code 0x${code.toHexString} is not in the v3 code map")
+      inflKeyKindMap(code)
     }
-    // width of the PC slice a D$ line remembers about its filler / last storer
+    require(inflKeyKindMap.size == 29, "[RECV3] the v3 code map has 29 codes (EMPTY included: design 2.5 + 0x36 BTB_DISPLACE)")
+    require(inflKeyKindMap.keys.forall(c => c >= 0 && c < (1 << inflTypeWidthCF)) && !inflKeyKindMap.contains(0x26),
+      "[RECV3] code outside 6 bits, or the retired 0x26 reused")
+
+    // width of the PC slice a D$ line / BTB record remembers about its filler / last storer / trainer
     val inflPcBitsCF          = 12  // PC[13:2]
-    val inflTypeWidthCF       = 5   // bits to hold up to 31 influence types
+    require(inflKeyWidthCF == inflPcBitsCF, "[RECV3] a PC-keyed slot stores PC[13:2] whole in the 12-bit key")
+
+    // [RECV3] record classes (design 2.2): bits [3:0] of every 256-bit record; class[3] = 1 means state record.
+    // 4-7 and 9-15 are reserved (the decoder rejects them).
+    val REC_NOP    = 0
+    val REC_COMMIT = 1
+    val REC_SQUASH = 2
+    val REC_KILL   = 3
+    val REC_STATE  = 8
+    // SQUASH record kind, bits [7:4] (design 2.6)
+    val SQ_KIND_BRKILL   = 0   // branch kill (v1 [FLUSH] SRC=3)
+    val SQ_KIND_ROLLBACK = 1   // exception rollback (v1 [FLUSH] SRC=4)
+    // STATE record header group-valid bit positions (design 5.1); [8] is dbg, [15:12] reserved 0
+    val STATE_GV_R     = 4
+    val STATE_GV_M     = 5
+    val STATE_GV_L     = 6
+    val STATE_GV_IC    = 7
+    val STATE_GV_RAS   = 9
+    val STATE_GV_PRED  = 10
+    val STATE_GV_EPOCH = 11
 
     // Bit widths of reconfiguration control wires
     // we support 4 parameter reconfiguration and each field is 8 bit wide
