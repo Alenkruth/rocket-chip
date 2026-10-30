@@ -5,6 +5,7 @@ package freechips.rocketchip.resources
 import org.chipsalliance.cde.config.Field
 import sys.process._
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
+import java.nio.ByteBuffer
 import freechips.rocketchip.diplomacy.{AddressRange}
 
 case object DTSModel    extends Field[String]
@@ -137,6 +138,13 @@ object DTB
     require (proc.! == 0, "Failed to run dtc; is it in your path?")
     instream.close
     outstream.close
-    DTB(outstream.toByteArray)
+    // the exit code alone does not catch a short pipe capture; check magic and totalsize in the header
+    val bytes = outstream.toByteArray
+    require (bytes.length >= 8, s"dtc output truncated: ${bytes.length} bytes, no DTB header")
+    val magic = ByteBuffer.wrap(bytes, 0, 4).getInt
+    val totalsize = ByteBuffer.wrap(bytes, 4, 4).getInt
+    require (magic == 0xd00dfeed, f"dtc output is not a DTB: magic 0x$magic%08x")
+    require (bytes.length >= totalsize, s"dtc output truncated: captured ${bytes.length} of $totalsize bytes")
+    DTB(bytes)
   }
 }
