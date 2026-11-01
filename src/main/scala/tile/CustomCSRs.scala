@@ -132,6 +132,24 @@ class CustomCSRs(implicit p: Parameters) extends CoreBundle {
   protected def iftStatsCSRIdCF = 0xbce
   protected def iftStatsCSRCF: Option[CustomCSR] = None
 
+  // Hardware-defense CSRs (defense-clean-plans *-plan-v5.md). None unless the BOOM core overrides them. Ids fixed (owner ALL-1, SA-V4).
+  protected def sttCtlCSRIdCF           = 0xbd0   // STT_CTL: [0] en [1] fut [2] sta_notx [4] exp_only [5] delay_exec [6] dbg (mask 0x77)   // [v6]
+  protected def sttCtlCSRCF: Option[CustomCSR] = None
+  protected def sttStatCSRIdCF          = 0xbd1   // STT_STAT (RO, hw-written): [31:0] held-slot cycles [63:32] STL-held search cycles
+  protected def sttStatCSRCF: Option[CustomCSR] = None
+  protected def doppelgangerCtlCSRIdCF  = 0xbd2   // DOPPELGANGER_CTL: [0] en (mask 0x1)
+  protected def doppelgangerCtlCSRCF: Option[CustomCSR] = None
+  protected def doppelgangerStatCSRIdCF = 0xbd3   // DOPPELGANGER_STAT (RO): [11:0] issued [23:12] released [35:24] dead [47:36] mispred [59:48] train drops
+  protected def doppelgangerStatCSRCF: Option[CustomCSR] = None
+  protected def specasanCtlCSRIdCF      = 0xbd4   // SPECASAN_CTL: [0] EN (tag checks; implies TBI) [1] TBI (top-byte ignore only) (mask 0x3)
+  protected def specasanCtlCSRCF: Option[CustomCSR] = None
+  protected def specasanPaintCSRIdCF    = 0xbd5   // SPECASAN_PAINT: write {color[63:60], granule paddr} = the tag store (STG)
+  protected def specasanPaintCSRCF: Option[CustomCSR] = None
+  protected def cevicheCtlCSRIdCF       = 0xbd6   // CEVICHE_CTL: [0] en [4:1] pol0 RWIS [8:5] pol1 [19:9] hard_d [30:20] soft_d [40:31] hard_i [50:41] soft_i
+  protected def cevicheCtlCSRCF: Option[CustomCSR] = None
+  protected def specasanStatCSRIdCF     = 0xbd7   // SPECASAN_STAT (RO, hw-written): specasan-plan-v5.md section 6
+  protected def specasanStatCSRCF: Option[CustomCSR] = None
+
   // CSR for FTQ size reconfiguration (2-bit index into ftQueueEntryOptions)
   protected def ftqSizeCSRIdCF = 0xbc5
   protected def ftqSizeCSRCF: Option[CustomCSR] = None
@@ -176,7 +194,8 @@ class CustomCSRs(implicit p: Parameters) extends CoreBundle {
                               ftqSizeCSRCF ++ rasCountCSRCF ++ pregSizeCSRCF ++
                               issueQueueCSRCF ++ btbConfigCSRCF ++ tageCountCSRCF ++
                               icacheCSRCF ++ coreWidthCSRCF ++ cachectlCSRCF ++ dcacheStatusCSRCF ++
-                              iftStatsCSRCF
+                              iftStatsCSRCF ++ sttCtlCSRCF ++ sttStatCSRCF ++ doppelgangerCtlCSRCF ++ doppelgangerStatCSRCF ++
+                              specasanCtlCSRCF ++ specasanPaintCSRCF ++ cevicheCtlCSRCF ++ specasanStatCSRCF
 
   val csrs = Vec(decls.size, new CustomCSRIO)
 
