@@ -149,6 +149,9 @@ class CustomCSRs(implicit p: Parameters) extends CoreBundle {
   protected def cevicheCtlCSRCF: Option[CustomCSR] = None
   protected def specasanStatCSRIdCF     = 0xbd7   // SPECASAN_STAT (RO, hw-written): specasan-plan-v5.md section 6
   protected def specasanStatCSRCF: Option[CustomCSR] = None
+  // [DIV2] DIV_CTL: [0] enable the second integer divider (unit 2); reset 0 = one divider = the stock design. DMI-only reconfiguration.
+  protected def divCtlCSRIdCF           = 0xbcf
+  protected def divCtlCSRCF: Option[CustomCSR] = None
 
   // CSR for FTQ size reconfiguration (2-bit index into ftQueueEntryOptions)
   protected def ftqSizeCSRIdCF = 0xbc5
@@ -195,7 +198,7 @@ class CustomCSRs(implicit p: Parameters) extends CoreBundle {
                               issueQueueCSRCF ++ btbConfigCSRCF ++ tageCountCSRCF ++
                               icacheCSRCF ++ coreWidthCSRCF ++ cachectlCSRCF ++ dcacheStatusCSRCF ++
                               iftStatsCSRCF ++ sttCtlCSRCF ++ sttStatCSRCF ++ doppelgangerCtlCSRCF ++ doppelgangerStatCSRCF ++
-                              specasanCtlCSRCF ++ specasanPaintCSRCF ++ cevicheCtlCSRCF ++ specasanStatCSRCF
+                              specasanCtlCSRCF ++ specasanPaintCSRCF ++ cevicheCtlCSRCF ++ specasanStatCSRCF ++ divCtlCSRCF
 
   val csrs = Vec(decls.size, new CustomCSRIO)
 
