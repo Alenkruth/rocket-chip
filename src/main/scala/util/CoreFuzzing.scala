@@ -85,6 +85,10 @@ trait CoreFuzzingConstants{
     val INFL_FTQ_FULL          = 0x14  // OC    fetch starved by a full FTQ (the patch-59 edge, own code; key = the captured blocker)
     val INFL_REG_PRESSURE      = 0x15  // OC    rename stalled on free registers (key = the stuck head)
     val INFL_MEM_HOL           = 0x16  // OC    LDQ/STQ head-of-line blocking (key = the head)
+    val INFL_DRAIN_WAIT        = 0x17  // OC    serializing uop (is_unique: CSR / fence / fence.i / AMO / LR / SC / xRET / wfi;
+                                       //       every uop under disableOOO) held at dispatch by the ROB / STQ / MSHR drain
+                                       //       (key = the last flagged blocker: a ROB head, the STQ head or an MSHR's primary)
+                                       //       [owner 2026-11-04, RULES C "Drain edges U6 + U6b": own code; 0x10 / 0x16 unchanged]
     val INFL_ISSUE_CONTENTION  = 0x20  // OC    issue port denied to a ready uop (key = the winner)
     val INFL_FU_BUSY           = 0x21  // OC    non-pipelined unit busy (key = the occupant)
     val INFL_DC_BANKCONF       = 0x22  // OC    D$ data-bank conflict nack (key = the older lane's access)
@@ -112,7 +116,7 @@ trait CoreFuzzingConstants{
       INFL_REG_DATAFLOW -> KEY_OC, INFL_STL_FORWARD -> KEY_OC, INFL_STL_PARTIAL -> KEY_OC, INFL_MEM_DATAFLOW -> KEY_PC,
       INFL_MEM_ORDER -> KEY_OC, INFL_LRSC -> KEY_OC, INFL_CONTROL_FLOW -> KEY_NONE,
       INFL_ROB_FULL -> KEY_OC, INFL_LDQ_FULL -> KEY_OC, INFL_STQ_FULL -> KEY_OC, INFL_IQ_FULL -> KEY_OC,
-      INFL_FTQ_FULL -> KEY_OC, INFL_REG_PRESSURE -> KEY_OC, INFL_MEM_HOL -> KEY_OC,
+      INFL_FTQ_FULL -> KEY_OC, INFL_REG_PRESSURE -> KEY_OC, INFL_MEM_HOL -> KEY_OC, INFL_DRAIN_WAIT -> KEY_OC,
       INFL_ISSUE_CONTENTION -> KEY_OC, INFL_FU_BUSY -> KEY_OC, INFL_DC_BANKCONF -> KEY_OC, INFL_DC_NACK -> KEY_PC,
       INFL_LSU_LANE -> KEY_OC, INFL_DC_PORT_BLOCK -> KEY_OC, INFL_LOAD_PAUSE -> KEY_NONE,
       INFL_BPD_STATE -> KEY_OC, INFL_BTB_STATE -> KEY_NONE, INFL_RAS_STATE -> KEY_OC, INFL_ICACHE_STATE -> KEY_OC,
@@ -121,7 +125,7 @@ trait CoreFuzzingConstants{
       require(inflKeyKindMap.contains(code), s"[RECV3] influence code 0x${code.toHexString} is not in the v3 code map")
       inflKeyKindMap(code)
     }
-    require(inflKeyKindMap.size == 29, "[RECV3] the v3 code map has 29 codes (EMPTY included: design 2.5 + 0x36 BTB_DISPLACE)")
+    require(inflKeyKindMap.size == 30, "[RECV3] the v3 code map has 30 codes (EMPTY included: design 2.5 + 0x36 BTB_DISPLACE + 0x17 DRAIN_WAIT)")
     require(inflKeyKindMap.keys.forall(c => c >= 0 && c < (1 << inflTypeWidthCF)) && !inflKeyKindMap.contains(0x26),
       "[RECV3] code outside 6 bits, or the retired 0x26 reused")
 
